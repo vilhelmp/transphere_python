@@ -86,6 +86,8 @@ class Make(object):
         'rout',         8000,           'AU',   'float',    # Outer radius of shell
         'nshell',       200,            ' ',    'int',      # Number of shells
         'spacing',      'powerlaw1',    ' ',    'str',      # Type of grid spacing
+        'r_flat',       10,             'AU',   'int',      # Radius where density becomes flat
+        't_uplim',      -1,             'K',    'float',    # upper limit of temperature
         'nref',         0,              ' ',    'int',      # Refinement shells
         'rref',         0.0,            'AU',   'float',    # Refinement radius
         'rstar',        3.0,            'AU',   'float',    # Stellar radius
@@ -213,6 +215,7 @@ class Make(object):
         self.r0    *= _cgs.AU   # cm
         self.rstar *= _cgs.RSUN # cm
         self.mstar *= _cgs.MSUN # g
+        self.r_flat *= _cgs.AU  # cm
         
         if self.rref:
             # if we want refinement, just call the grid function twice
@@ -303,6 +306,7 @@ class Make(object):
             # calculate the gas density
             self.rho_gas = self.n_h2 * _cgs.MUH2 * _cgs.MP              # g * cm-3
             self.rho_dust = self.rho_gas /self.gas2dust                 # g * cm-3
+
             # apply radial dependence to the H2 number density
                           # nh2 * cm-3
             # gas to dust is mass relationship
@@ -328,7 +332,34 @@ class Make(object):
             # gas to dust is mass relationship
             # g * cm-3 
             #~ self.rho_dust = self.rho0_gas / self.Input.gas2dust * r_dependence 
-                        
+        elif self.rho_type == 'flat_powerlaw1':
+            # 1E-2  - gas-to-dust
+            # get the DUST density
+            #~ self.rho_gas = self.rho0_gas * (self.radii / self.r0)**(self.plrho)
+            r_dependence = (self.radii / self.r0)**(self.plrho)
+            ind = (self.radii <= self.r_flat).nonzero()[0]
+            if len( ind ) < 1:
+                raise Exception('No points inside of r_flat')
+            else:
+                r_dependence[ind] = r_dependence[ind[-1]]
+            # now also save the dust density, and H2 number density
+            #~ self.rho_gas = self.rho0_gas * (self.radii / self.r0)**(self.plrho)
+            #~ self.n_h2 = self.rho_gas / (_cgs.MUH2 * _cgs.MP)
+            #~ self.rho_dust = self.n_h2 * 1 / self.gas2dust
+            #
+            # n0 is in nh2 / cm3
+            #    g/cm3           nh2 / cm3 * amu/h2 * mass of amu(g)
+            #~ self.rho0_gas = self.n0 * _cgs.MUH2 * _cgs.MP   # g * cm-3
+            # all gas, MUH2 is including H2+He+Metals
+            # apply the radial dependence to the gas density
+            #~ self.rho_gas = self.rho0_gas * r_dependence     # g * cm-3
+            # apply radial dependence to the H2 number density
+            self.n_h2 = self.n0 * r_dependence              # nh2 * cm-3
+            self.rho_gas = self.n_h2 * _cgs.MUH2 * _cgs.MP  # g * cm-3
+            self.rho_dust = self.rho_gas / self.gas2dust  # g * cm-3
+            # gas to dust is mass relationship
+            # g * cm-3 
+            #~ self.rho_dust = self.rho0_gas / self.Input.gas2dust * r_dependence 
         else:
             raise Exception('rho_type parameter not recognised')
 
@@ -612,6 +643,9 @@ class Make(object):
         self.transphere_output = ''.join(trans_out)
         # read in the output-files, for checks, plots etc
         self.Envstruct, self.Convhist = read_transphereoutput(self)
+        if self.t_uplim > 0:
+            ind = (self.Envstruct.temp >= self.t_uplim).nonzero()[0]
+            self.Envstruct.temp[ind] = self.t_uplim
         
 
 
@@ -721,6 +755,9 @@ def read_transphereoutput(self, ext = 0):
     #~ convhist={'r': r, 'temp': temp, 'jjme': jjme, 'hhme': hhme, 'jj': jj, 'hh': hh, 'kapt': kapt, 'kapj': kapj, 'kaph': kaph, 'fj': fj}
     #~ self.Envstruct = envstruct
     #~ self.convhist = convhist
+    if self.t_uplim > 0:
+        ind = (Envstruct.temp >= self.t_uplim).nonzero()[0]
+        Envstruct.temp[ind] = self.t_uplim
     return Envstruct, Convhist
 
 def create_grid(r_in, r_out, nshell, space = 'powerlaw1', end = True):
@@ -732,7 +769,7 @@ def create_grid(r_in, r_out, nshell, space = 'powerlaw1', end = True):
         start = [log10(r_in), 0][r_in == 0]
         stop = log10(r_out)
         radii = logspace(start, stop, num=nshell, endpoint=end)
-    elif space == "powerlaw1":
+    elif space in ["powerlaw1", "flat_powerlaw1"]:
         from scipy import arange
         radii = r_in * (r_out/r_in)**(arange(nshell)/(nshell - 1.0))
     elif space == 'linear':
