@@ -1,11 +1,16 @@
 
 
+import os as _os
+import sys as _sys
+import subprocess as _subprocess
+import scipy as _scipy
+from matplotlib import pyplot as _plt
+from . import cgsconst as _cgs
 
+from .helpers import *
 
-
-
-
-
+#nice line settings
+NiceLineSettings = dict(lw=1, ms=3, mew=0, marker='o')
 
 
 class Make(object):
@@ -608,3 +613,293 @@ class Make(object):
         # read in the output-files, for checks, plots etc
         self.Envstruct, self.Convhist = read_transphereoutput(self)
         
+
+
+########################################################################
+# MODELING HELP FUNCTIONS
+def bplanck(nu,T): # Returns the Spectral Radiance (Planck)
+    from scipy import exp, constants
+    try:
+        x = _cgs.HH*nu/(_cgs.KK*T)
+        bpl = (2.0*_cgs.HH*nu**3/_cgs.CC**2)/(exp(x)-1.0)
+        return bpl
+    except (ZeroDivisionError):
+        return 0
+
+def read_transphereoutput(self, ext = 0):
+    from scipy import array
+    if ext == 0: ext=''
+    filetoread = 'envstruct' + ext + '.dat'
+    path_to_file = _os.path.join(self.directory, filetoread)
+    with open(path_to_file, 'r') as f:
+        lines = f.read().split('\n')
+    nr = int(lines[0])
+    dat_envstruct = array([i.split() for i in lines[2:nr + 2]], dtype='float')
+
+
+    filetoread = 'spectrum.dat'
+    path_to_file = _os.path.join(self.directory, filetoread)
+    with open(path_to_file, 'r') as f:
+        lines = f.read().split('\n')
+    nr = int(lines[0])
+    dat_spectrum = array([i.split() for i in lines[2:nr+2]], dtype='float')
+
+    #~ nr = int(f.readline().strip())
+    #~ dat = np.zeros((3,nr),float)
+    #~ for ii in range(0,3):
+        #~ for jj in range(0,nr):
+            #~ dum = f.readline().strip()
+            #~ dat[ii,jj] = dum
+    #~ f.close()
+    class Envstruct:
+        r = dat_envstruct[:,0]
+        rho_dust = dat_envstruct[:,1]
+        temp = dat_envstruct[:,2]
+
+    #~ class Spectrum:
+    Envstruct.frequency = dat_spectrum[:,0]
+    Envstruct.intensity = dat_spectrum[:,1]
+    #~ Envstruct.Spectrum = Spectrum
+    #~ self.Envstruct = Envstruct
+
+    #~ import numpy as np
+    filetoread = 'convhist.info'
+    path_to_file = _os.path.join(self.directory, filetoread)
+    f = open(path_to_file, 'r')
+    nn = int(f.readline().strip().split()[0])
+    f.close()
+
+    # Convergence history
+    filetoread = 'convhist.dat'
+    path_to_file = _os.path.join(self.directory, filetoread)
+    with open(path_to_file, 'r') as f:
+        lines = f.read().split('\n')
+    nr = int(lines[0].strip())
+    if nr == 0: raise Exception('Nothing run, no convergence history.')
+    x1 = nr+1
+
+    #These need to depend on value of nr
+    dat1 = array([i.split() for i in lines[1:x1]], dtype='float')
+    dat2 = array([i.split() for i in lines[x1+1:x1*2]], dtype='float')
+    dat3 = array([i.split() for i in lines[x1*2+1:x1*3]], dtype='float')
+
+    dat = array([dat1,dat2,dat3])
+
+    #~ f = open('convhist.dat','r')
+    #~ nr = int(f.readline().strip())
+    #~ dat = np.zeros((9,nn,nr),float)
+    #~ for jj in range(0,nn):
+        #~ for kk in range(0,nr):
+            #~ dum = f.readline().strip().split()
+            #~ if dum == []: dum=f.readline().strip().split()
+            #~ dat[0:9,jj,kk]=np.array(dum,dtype=float)
+    #~ f.close()
+
+#    if nn gt 1 then idx=[1,2,0] else idx=[1,0]. Note transpose commands not executed...
+    class Convhist:
+        temp=dat[:,:,0]
+        jjme=dat[:,:,1]
+        hhme=dat[:,:,2]
+        jj=  dat[:,:,3]
+        hh=  dat[:,:,4]
+        kapt=dat[:,:,5]
+        kapj=dat[:,:,6]
+        kaph=dat[:,:,7]
+        fj=  dat[:,:,8]
+    #~ self.Convhist = Convhist
+
+    #~ f = open('envstruct.inp')
+    #~ nr = int(f.readline().strip())
+    #~ dat = np.zeros((3,nr),float)
+    #~ for ii in range(0,nr):
+        #~ dum=f.readline().strip().split()
+        #~ if dum == []: dum=f.readline().strip().split()
+        #~ dat[0:3,ii]=np.array(dum,dtype=float)
+    #~ r=dat[0,:]
+    #~ f.close()
+
+    #~ convhist={'r': r, 'temp': temp, 'jjme': jjme, 'hhme': hhme, 'jj': jj, 'hh': hh, 'kapt': kapt, 'kapj': kapj, 'kaph': kaph, 'fj': fj}
+    #~ self.Envstruct = envstruct
+    #~ self.convhist = convhist
+    return Envstruct, Convhist
+
+def create_grid(r_in, r_out, nshell, space = 'powerlaw1', end = True):
+    # function to create grid
+    if space == 'log10':
+        from scipy import log10, logspace
+        # get the exponent of the start- and
+        # stop-radius in input units
+        start = [log10(r_in), 0][r_in == 0]
+        stop = log10(r_out)
+        radii = logspace(start, stop, num=nshell, endpoint=end)
+    elif space == "powerlaw1":
+        from scipy import arange
+        radii = r_in * (r_out/r_in)**(arange(nshell)/(nshell - 1.0))
+    elif space == 'linear':
+        from scipy import linspace
+        # linearly spaced grid
+        radii = linspace(r_in, r_out, num=nshell, endpoint=end)
+    elif space == 'powerlaw2':
+        from scipy import linspace
+        # first check if coefficients to the power-law was given
+        #~ if 'exp' in kwargs:
+            #~ p_exp = kwargs['exp']
+        #~ else: # if not, set it to 2, i.e. r^2
+            #~ p_exp = 2
+        radii = r_in + (r_out - r_in)*(linspace(r_in, r_out, num=nshell, endpoint=end)/(r_out))**2
+        #pr_int('Not implemented yet.')
+        #raise ParError(spaced)
+    else:
+        raise Exception(space)
+    return radii
+
+# FIXME, does not work tries to import old adavis module
+def plot_spectrum(freq, intensity, dpc = 0, jy = 0, pstyle = '', xlog = 1, ylog = 1):
+    import sys
+    import matplotlib.pyplot as pl
+    pl.ion()
+    #~ from ..views import set_rc
+    #~ set_rc
+    xcoord = 1.0e4 * _cgs.CC / freq
+
+    if dpc == 0: sys.exit('Error: distance needs to be set when plotting flux')
+
+    distfact = 1.e0/ (dpc**2)
+
+    if jy != 0:
+        lumfact = 1e+23
+    else:
+        lumfact = freq
+
+    pl.plot(xcoord, distfact * lumfact * intensity, pstyle)
+    pl.xlabel(r'$\lambda\, [\mu \mathrm{m}]$')
+
+    if jy != 0:
+        pl.ylabel(r'$F_\nu$\, [Jy]')
+    else:
+        pl.ylabel(r'$\nu F_\nu \, [\mathrm{erg cm}^{-2}\, \mathrm{s}^{-1}]$')
+
+    if xlog == 1: pl.xscale('log')
+    if ylog == 1: pl.yscale('log')
+
+
+# FIXME, does not work tries to import old adavis module
+
+# temporary function
+# needs to be more modular
+def plot_envstruct(self, mol_abundance = '', mark100k = True, **kawargs):
+    if not hasattr(self, 'Envstruct'):
+        raise Exception('you havent read in the transphere output')
+    import matplotlib.pyplot as pl
+    from matplotlib.ticker import ScalarFormatter, LogFormatter
+    pl.ion()
+    pl.close()
+    fig = pl.figure(1, figsize=(8,6))
+    ax1 = fig.add_subplot(111)
+    pl.grid()
+    ax2 = ax1.twinx()
+    # Density
+    p1 = ax1.loglog(self.Envstruct.r/_cgs.AU, self.n_h2, label='n_H2', **kawargs)
+    ax1.set_xlabel('Radius (AU)')
+    #~ ax1.set_xscale('log')
+    ax1.set_ylabel('Number Density (cm-3)')
+    # Temperature
+    p2 = ax2.loglog(self.Envstruct.r/_cgs.AU, self.Envstruct.temp, color='r', label='Temp', **NiceLineSettings)
+
+    ax2.yaxis.set_major_formatter(ScalarFormatter())
+    
+    ax2.set_ylabel('Temp (K)', color='r')
+    if mol_abundance != '':
+        def make_patch_spines_invisible(ax):
+            ax.set_frame_on(True)
+            ax.patch.set_visible(False)
+            for sp in ax.spines.itervalues():
+                sp.set_visible(False)
+        ax3 = ax1.twinx()
+        #~ ylims = ax3.get_ylim()
+        #ax3.set_ylim(-0.05E-7, 1.85E-7)
+
+        #~ p3 = ax3.loglog(self.Envstruct.r/_cgs.AU, mol_abundance, 'g')
+        p3 = ax3.semilogx(self.Envstruct.r/_cgs.AU, mol_abundance, color='g', label='Mol Abund', **NiceLineSettings)
+        ax3.spines["right"].set_position(("axes", 1.2))
+        make_patch_spines_invisible(ax3)
+        ax3.spines["right"].set_visible(True)
+        ax3.set_ylabel('Rel. Abundance', color='g')
+        #ax1.legend([p1, p2, p3], ['Density', 'Temp', 'Rel. Abundance'])
+        #~ ax3.yaxis.set_major_formatter(())
+        #~ ax3.xticks(['1E-9','1E-8','1E-7','1E-6','1E-5','1E-4'],[1E-9,1E-8,1E-7,1E-6,1E-5,1E-4])
+        #~ ax3.set_yticks([1E-9,1E-8,1E-7,1E-6,1E-5,1E-4], minor=True)
+        #~ ax3.tick_params(axis='y', direction='in')
+        fig.subplots_adjust(right = 0.75)
+    
+    if mark100k:
+        from scipy import where
+        # where is the value closest to 100 K?
+        i_100k = where(abs(100 - self.Envstruct.temp).round(2) == round(min(abs(100 - self.Envstruct.temp)), 2))[0][0]
+        r_100k = self.Envstruct.r[i_100k]/_cgs.AU
+        t_100k = self.Envstruct.temp[i_100k]
+        ax2.annotate('T = {0:.1f} K\nR = {1:.1f} AU'.format(round(t_100k,2), r_100k),
+                xy=(r_100k, t_100k), xycoords='data',
+                xytext=(-30, -100), textcoords='offset points', fontsize=12,
+                arrowprops=dict(arrowstyle="->", connectionstyle="arc3,rad=-.2"))
+        #~ ax2.plot([r_100k], [t_100k] , 'o',color='r', ms=4, mew=0)
+        #~ pl.legend('n_H2', 'Temp', 'Mol Abund')
+    #~ else:
+    ax1.xaxis.set_major_formatter(ScalarFormatter())
+    if mol_abundance == '':
+        #Create custom artists
+        simArtist = pl.Line2D((0,1),(0,0), color='b')
+        anyArtist = pl.Line2D((0,1),(0,0), color='r')
+        
+        #Create legend from custom artist/label lists
+        ax1.legend([simArtist,anyArtist],
+                  ['Density', 'Temperature'])
+    elif mol_abundance != '':
+        #Create custom artists
+        simArtist = pl.Line2D((0,1),(0,0), color='b')
+        anyArtist = pl.Line2D((0,1),(0,0), color='r')
+        molArtist = pl.Line2D((0,1),(0,0), color='g')
+        
+        #Create legend from custom artist/label lists
+        ax1.legend([simArtist, anyArtist, molArtist],
+                  ['Density', 'Temperature', 'Mol. abundance'])
+    
+def cleanup_transphere():
+    import os
+    filelist = ['convhist.info', 'external_meanint.inp' , 'spectrum.dat', 'transphere.dat', 'dustopac_1.inp',  'envstruct.dat', 'starinfo.inp', 'transphere.inp', 'convhist.dat',  'dustopac.inp', 'envstruct.inp', 'starspectrum.inp']
+    for f in filelist:
+        os.system('rm {0}'.format(f))
+
+def save_transphere(Obj, filename = 'transpheremodel.pickle'):
+    # take input object
+    # and save it as a dictionary to filename in directory
+    import pickle
+    # take all the original input parameters and put into a dictionary
+    inp = vars(Obj.Input)
+    # now, a dictionary is a non dynamic structure
+    # as opposed to a dynamically created object attribute
+    # e.g., with the __dict__ method (-> doesn't work with pickle)
+    with ChangeDirectory(Obj.directory):
+        with open(filename, 'w') as f:
+            pickle.dump(inp, f)
+
+def load_transphere(directory = '', filename = 'transpheremodel.pickle'):
+    # load input object from filename in directory
+    # and create the transphere object
+    import pickle
+    with open(_os.path.join(directory, filename), 'r') as f:
+        inputdict = pickle.load(f)
+    Obj = Transphere(**inputdict)
+    # IDEA : add so that it loads the output(?) as well?
+    return Obj
+
+def _pdfcheck(pdf):
+        if not pdf: 
+            _plt.ion()
+        elif pdf:
+            _plt.ioff()
+
+def _pdfsave(pdf, pdfname, **kwargs):
+    if pdf:
+            _plt.savefig('{0}.pdf'.format(str(pdfname)), kwargs)
+
