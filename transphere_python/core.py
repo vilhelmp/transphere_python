@@ -82,25 +82,26 @@ class Make(object):
         """
         # Checking input parameters
         params = array([
-        'rin',          20,             'AU',   'float',    # Inner radius of shell
-        'rout',         8000,           'AU',   'float',    # Outer radius of shell
+        'rin',          20,            'AU',   'float',    # Inner radius of shell
+        'rout',         8000,          'AU',   'float',    # Outer radius of shell
         'nshell',       200,            ' ',    'int',      # Number of shells
         'spacing',      'powerlaw1',    ' ',    'str',      # Type of grid spacing
-        'r_flat',       10,             'AU',   'int',      # Radius where density becomes flat
-        't_uplim',      -1,             'K',    'float',    # upper limit of temperature
+        'r_flat',       0,             'AU',   'float',      # Radius where density becomes flat
+        't_flat',       0,             'AU',   'float',      # Radius where temperature becomes flat, preceeds t_uplim
+        't_uplim',      0,              'K',    'float',    # upper limit of temperature
         'nref',         0,              ' ',    'int',      # Refinement shells
-        'rref',         0.0,            'AU',   'float',    # Refinement radius
-        'rstar',        3.0,            'AU',   'float',    # Stellar radius
+        'rref',         0.0,           'AU',   'float',    # Refinement radius
+        'rstar',        3.0,           'AU',   'float',    # Stellar radius
         'tstar',        5780,           'K',    'float',    # Stellar temperature
-        'mstar',        1,              'MSUN', 'float',    # Stellar mass
+        'mstar',        1,           'MSUN', 'float',    # Stellar mass
         'isrf',         0.0,            ' ',    'mixed',    # Scaling of ISRF
         'tbg',          2.73,           'K',    'float',    # Spectral shape of ISRF (Blackbody equivalent temperature). With -1 the spectrum is read from the file isrf.inp and scaled by ISRF.
-        'dpc',          250,            'PC',   'float',    # Distance to source in pc
-        'r0',           1.0E3,          'AU',   'float',    # Reference radius
+        'dpc',          250,           'PC',   'float',    # Distance to source in pc
+        'r0',           1.0E3,         'AU',   'float',    # Reference radius
         'plrho',        -1.5,           ' ',    'float',    # Powerlaw for rho
         'rho_type',     'powerlaw1',    ' ',    'str',      # Type of rho dependence with radius ['powerlaw1', 'shu-knee']
-        'n0',           2e6,            'cm-3', 'float',    # H2 number density at reference radius
-        'r_knee',       1280.0,         'AU',   'float',    # At what radius should the knee be (AU)
+        'n0',           2e6,         'cm-3', 'float',    # H2 number density at reference radius
+        'r_knee',       1280.0,        'AU',   'float',    # At what radius should the knee be (AU)
         'gas2dust',     100.0,          ' ',    'float',    # Gas to dust ratio
         'localdust',    False,          ' ',    'bool',     # Dust opacity local?
         'silent',       True,           ' ',    'bool',     # Verbose?
@@ -216,6 +217,7 @@ class Make(object):
         self.rstar *= _cgs.RSUN # cm
         self.mstar *= _cgs.MSUN # g
         self.r_flat *= _cgs.AU  # cm
+        self.t_flat *= _cgs.AU  # cm
         
         if self.rref:
             # if we want refinement, just call the grid function twice
@@ -643,9 +645,13 @@ class Make(object):
         self.transphere_output = ''.join(trans_out)
         # read in the output-files, for checks, plots etc
         self.Envstruct, self.Convhist = read_transphereoutput(self)
-        if self.t_uplim > 0:
+        if self.t_uplim:
             ind = (self.Envstruct.temp >= self.t_uplim).nonzero()[0]
             self.Envstruct.temp[ind] = self.t_uplim
+        elif self.t_flat:
+            ind = (self.radii <= self.t_flat).nonzero()[0]
+            #~ ind = (self.Envstruct.temp >= self.t_uplim).nonzero()[0]
+            self.Envstruct.temp[ind] = self.Envstruct.temp[max(ind)]
         
 
 
@@ -755,9 +761,13 @@ def read_transphereoutput(self, ext = 0):
     #~ convhist={'r': r, 'temp': temp, 'jjme': jjme, 'hhme': hhme, 'jj': jj, 'hh': hh, 'kapt': kapt, 'kapj': kapj, 'kaph': kaph, 'fj': fj}
     #~ self.Envstruct = envstruct
     #~ self.convhist = convhist
-    if self.t_uplim > 0:
+    if self.t_uplim:
         ind = (Envstruct.temp >= self.t_uplim).nonzero()[0]
         Envstruct.temp[ind] = self.t_uplim
+    elif self.t_flat:
+        ind = (self.radii <= self.t_flat).nonzero()[0]
+        #~ ind = (self.Envstruct.temp >= self.t_uplim).nonzero()[0]
+        Envstruct.temp[ind] = Envstruct.temp[max(ind)]
     return Envstruct, Convhist
 
 def create_grid(r_in, r_out, nshell, space = 'powerlaw1', end = True):
