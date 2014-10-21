@@ -84,37 +84,37 @@ class Make(object):
         params = array([
         'rin',          20,            'AU',   'float',    # Inner radius of shell
         'rout',         8000,          'AU',   'float',    # Outer radius of shell
-        'nshell',       200,            ' ',    'int',      # Number of shells
-        'spacing',      'powerlaw1',    ' ',    'str',      # Type of grid spacing
+        'nshell',       200,            ' ',     'int',      # Number of shells
+        'spacing',      'powerlaw1',    ' ',     'str',      # Type of grid spacing
         'r_flat',       0,             'AU',   'float',      # Radius where density becomes flat
         't_flat',       0,             'AU',   'float',      # Radius where temperature becomes flat, preceeds t_uplim
-        't_uplim',      0,              'K',    'float',    # upper limit of temperature
-        'nref',         0,              ' ',    'int',      # Refinement shells
+        't_uplim',      0,              'K',   'float',    # upper limit of temperature
+        'nref',         0,              ' ',     'int',      # Refinement shells
         'rref',         0.0,           'AU',   'float',    # Refinement radius
         'rstar',        3.0,           'AU',   'float',    # Stellar radius
-        'tstar',        5780,           'K',    'float',    # Stellar temperature
-        'mstar',        1,           'MSUN', 'float',    # Stellar mass
-        'isrf',         0.0,            ' ',    'mixed',    # Scaling of ISRF
-        'tbg',          2.73,           'K',    'float',    # Spectral shape of ISRF (Blackbody equivalent temperature). With -1 the spectrum is read from the file isrf.inp and scaled by ISRF.
+        'tstar',        5780,           'K',   'float',    # Stellar temperature
+        'mstar',        1,           'MSUN',   'float',    # Stellar mass
+        'isrf',         0.0,            ' ',   'mixed',    # Scaling of ISRF
+        'tbg',          2.73,           'K',   'float',    # Spectral shape of ISRF (Blackbody equivalent temperature). With -1 the spectrum is read from the file isrf.inp and scaled by ISRF.
         'dpc',          250,           'PC',   'float',    # Distance to source in pc
         'r0',           1.0E3,         'AU',   'float',    # Reference radius
-        'plrho',        -1.5,           ' ',    'float',    # Powerlaw for rho
-        'rho_type',     'powerlaw1',    ' ',    'str',      # Type of rho dependence with radius ['powerlaw1', 'shu-knee']
-        'n0',           2e6,         'cm-3', 'float',    # H2 number density at reference radius
+        'plrho',        -1.5,           ' ',   'float',    # Powerlaw for rho
+        'rho_type',     'powerlaw1',    ' ',     'str',      # Type of rho dependence with radius ['powerlaw1', 'shu-knee']
+        'n0',           2e6,         'cm-3',   'float',    # H2 number density at reference radius
         'r_knee',       1280.0,        'AU',   'float',    # At what radius should the knee be (AU)
-        'gas2dust',     100.0,          ' ',    'float',    # Gas to dust ratio
+        'gas2dust',     100.0,          ' ',   'float',    # Gas to dust ratio
         'localdust',    False,          ' ',    'bool',     # Dust opacity local?
         'silent',       True,           ' ',    'bool',     # Verbose?
-        'nriter',       30,             ' ',    'int',      # Maximum nr of iterations
-        'convcrit',     1E-5,           ' ',    'float',    # Convergence criterion
-        'ncst',         10,             ' ',    'int',      # Nr of rays for star
-        'ncex',         30,             ' ',    'int',      # Nr of rays between star and Rin
-        'ncnr',         1,              ' ',    'int',      # Nr of rays per radial grid point
-        'itypemw',      1,              ' ',    'int',      # Type of mu weighting
+        'nriter',       30,             ' ',     'int',      # Maximum nr of iterations
+        'convcrit',     1E-5,           ' ',   'float',    # Convergence criterion
+        'ncst',         10,             ' ',     'int',      # Nr of rays for star
+        'ncex',         30,             ' ',     'int',      # Nr of rays between star and Rin
+        'ncnr',         1,              ' ',     'int',      # Nr of rays per radial grid point
+        'itypemw',      1,              ' ',     'int',      # Type of mu weighting
         'idump',        True,           ' ',    'bool',     # Dump convergence history?
-        'opacfile',     0,              ' ',    'str',      # Filename of opacityfile
-        'freqfile',     0,              ' ',    'str',      # Filename of frequency file
-        'directory',    '' ,            ' ',    'str'       # Directory to work in
+        'opacfile',     0,              ' ',     'str',      # Filename of opacityfile
+        'freqfile',     0,              ' ',     'str',      # Filename of frequency file
+        'directory',    '' ,            ' ',     'str'       # Directory to work in
                     ])
         print ('Model created with the following parameters:')
               
@@ -249,7 +249,6 @@ class Make(object):
         lower = radii[:-1]
         upper = radii[1:]
         self.radii = radii
-        self.r_midpt = array((lower+upper)/2)
         self.r_grid = array([array([i,j]) for i,j in zip(lower,upper)])
 
         #
@@ -257,6 +256,9 @@ class Make(object):
         #
         # calculate the density at all radial points
         if self.rho_type == 'powerlaw1':
+            
+            # this is dependent on the 
+            self.r_midpt = array((lower+upper)/2)
             # 1E-2  - gas-to-dust
             # get the DUST density
             #~ self.rho_gas = self.rho0_gas * (self.radii / self.r0)**(self.plrho)
@@ -282,6 +284,7 @@ class Make(object):
 
         elif self.rho_type == 'shu_knee':
             
+            self.r_midpt = array((lower+upper)/2)
             # where to put the knee
             self.r_knee = self.r_knee * _cgs.AU # in cm
             #
