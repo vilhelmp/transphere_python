@@ -7,12 +7,48 @@ import scipy as _scipy
 from matplotlib import pyplot as _plt
 from . import cgsconst as _cgs
 
-from .helpers import *
+
 
 #nice line settings
 NiceLineSettings = dict(lw=1, ms=3, mew=0, marker='o')
 
 
+########################################################################
+# new code
+
+from .helpers import *
+
+# pseudo at the moment
+# list of things that it should do.
+# how do I implement this best?
+
+# get parameters
+# parse/check parameters
+
+###Create various things###
+# create frequency grid from parameters
+# create_wavelength_grid(wbound = [0.01, 7., 50., 5.0e4], nwpoint = [50, 40, 40])
+# read the opacity table
+# interpolate opacity table to frequency grid
+# find kappa at 550 nm (why?)
+# create radial grid
+# calculate density profile
+# calculate tau
+###Write all stuff to disk###
+# write frequency file
+# write opacity input
+# write 'transphere.inp' file
+# write 'starinfo.inp' file
+# write 'starspectrum.inp' file
+# write 'external_meanint.inp' file
+# write 'envstruct.inp' file
+# run transphere
+# read in results
+# plot results
+
+
+
+########################################################################
 class Make(object):
     """
     Title
