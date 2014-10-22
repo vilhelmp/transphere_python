@@ -1,27 +1,28 @@
 
+import errno
+import os as os
+import scipy as sp
+import numpy as np
+from scipy import log10, arange, array, exp, pi, ones_like, zeros, size
 
-import os as _os
-#~ import sys as _sys
-#~ import subprocess as _subprocess
-#~ import scipy as _scipy
-#~ from matplotlib import pyplot as _plt
-
-
-
-
+# try to import AstroPy, if not raise ImportError with msg
+try:
+    import astropy.units as un
+    import astropy.constants as co
+except ImportError:
+    raise ImportError('You must have the module \'astropy\' installed!')
 
 ########################################################################
-# GENERAL HELP FUNCTIONS (move to adavis_core)
-def check_input(input_dictionary, input_defaults):
-    return 0
+# GENERAL HELP FUNCTIONS
 
 def make_dirs(path):
-    import errno
+    """
     # the makedirs function will raise a EEXIST error 
     # if the directory already exists, if so it returns False
     # if some other error is raise, it will raise that 
+    """
     try:
-        _os.makedirs(path)
+        os.makedirs(path)
     except OSError as exception:
         if exception.errno != errno.EEXIST:
             raise
@@ -29,46 +30,40 @@ def make_dirs(path):
             return False
     return True
 
-
 class ChangeDirectory:
+    """
+    Usage : 
+    
+    with ChangeDirectory("~/Library"):
+        # we are in ~/Library
+        run some code
+        import subprocess
+        subprocess.call("ls")
+    
+    after this you will still be in the previous directory
+    without having to change back    
+    """
     def __init__(self, newPath):
         self.newPath = newPath
 
     def __enter__(self):
-        self.savedPath = _os.getcwd()
-        _os.chdir(self.newPath)
+        self.savedPath = os.getcwd()
+        os.chdir(self.newPath)
 
     def __exit__(self, etype, value, traceback):
-        _os.chdir(self.savedPath)
-
-# Now you can enter the directory like this:
-
-#~ with cd("~/Library"):
-    #~ # we are in ~/Library
-    #~ run some code
-    #~ import subprocess
-    #~ subprocess.call("ls")
+        os.chdir(self.savedPath)
 
 
-
-
-
-import scipy as sp
-import numpy as np
-import adapy.libs.cgsconst as _cgs
-import matplotlib.pyplot as plt; plt.ion()
-import os as os
-import astropy.units as un
-import astropy.constants as co
-
+# path to the opacities directory with the .dat file containting
+# wavelength (microns), k_scattering, k_absorption
 OPACDIR = "opacities"
 
 pc2au = 206264.806 # 1 PC in AU, or arcsecond in ???
 # 206264.806 is also the number of arcsecs in a circle / 2pi
 
-deg2rad = lambda deg : deg * sp.pi / 180
+deg2rad = lambda deg : deg * pi / 180
 
-rad2deg  = lambda rad : rad * 180 / sp.pi
+rad2deg  = lambda rad : rad * 180 / pi
 
 def minmax(arr):
     return [arr.min(), arr.max()]
@@ -76,7 +71,8 @@ def minmax(arr):
 def plancknu(nu, temp):
     """
     Calculate the planck function at a frequency and temperature
-    Temperature can be an array.
+    Temperature can not be an array!
+    Frequency can be an array.
     
     Input
     -----
@@ -88,37 +84,48 @@ def plancknu(nu, temp):
     Jansky (Jy)
     
     """
-    import adapy.libs.cgsconst as _cgs
-    import scipy as _sp
-    import numpy as _np
-    x =(_cgs.HH*nu)/(_cgs.KK*temp)
+    if size(temp) > 1 :
+        raise StandardError('Temperature cannot be an array')
+    x =(co.h.cgs.value*nu)/(co.k_B.cgs.value*temp)
     #bbnu = 2.0*hh*nu*nu*nu/(cc*cc)*(1.0/(np.exp( (hh*nu)/(kk*temp)) - 1.0))
-    try:    # assume temp is an array
-        bbnu = sp.ones_like(temp)
-        bbnu = 2.0 * _cgs.HH * nu**3/(_cgs.CC**2)*(1.0/(sp.exp(x) - 1.0))
+    try:    # assume nu is an array
+        #~ bbnu = ones_like(temp)
+        bbnu = 2.0 * co.h.cgs.value * nu**3 / (co.c.cgs.value**2) * (1.0/(exp(x) - 1.0))
         # make sure we correct the function the same as if INT
         bbnu[x == 0] = 0.0
-        ind = x < 1e-5 
-        bbnu[ind] = 2.0 * nu**2*_cgs.KK*temp[ind]/(_cgs.CC**2)
-        ind = x > 20.0
-        bbnu[ind] = 2.0 * _cgs.HH * nu**3/(_cgs.CC**2) * sp.exp(-1.0*x[ind])
+        # commented out the approximations.
+        # why do we need them?
+        # Rayleigh-Jeans approximation (? low frequencies)
+        #~ ind = x < 1e-5 
+        #~ bbnu[ind] = 2.0 * nu[ind]**2 * co.k_B.cgs.value * temp / (co.c.cgs.value**2)
+        #~ # Wiens approximation (? high frequencies)
+        #~ ind = x > 20.0
+        #~ bbnu[ind] = 2.0 * co.h.cgs.value * nu[ind]**3 / (co.c.cgs.value**2) * exp(-1.0*x[ind])
     except (TypeError): # if TypeError is raised, its an integer
                         # so treat it like one
+        bbnu = 2.0 * co.h.cgs.value * nu**3 / (co.c.cgs.value**2) * (1.0/(exp(x) - 1.0))
         if x == 0:
             bbnu = 0.0
-        elif x < 1e-5:
-            bbnu = 2.0 * nu**2*_cgs.KK*temp/(_cgs.CC**2)
-        elif x > 20.0:
-            bbnu = 2.0 * _cgs.HH * nu**3/(_cgs.CC**2) * sp.exp(-1.0*x)
         else:
-            bbnu = 2.0 * _cgs.HH * nu**3/(_cgs.CC**2)*(1.0/(sp.exp(x) - 1.0))
+            bbnu = 2.0 * co.h.cgs.value * nu**3 / (co.c.cgs.value**2) * (1.0/(exp(x) - 1.0))
+        #~ if x == 0:
+            #~ bbnu = 0.0
+        # Rayleigh-Jeans approximation (? low frequencies)
+        #~ elif x < 1e-5:
+            #~ bbnu = 2.0 * nu**2 * co.k_B.cgs.value * temp / (co.c.cgs.value**2)
+        #~ # Wiens approximation (? high frequencies)
+        #~ elif x > 20.0:
+            #~ bbnu = 2.0 * co.h.cgs.value * nu**3 / (co.c.cgs.value**2) * exp(-1.0*x)
+        #~ else:
+            #~ bbnu = 2.0 * co.h.cgs.value * nu**3 / (co.c.cgs.value**2) * (1.0/(exp(x) - 1.0))
     # return Jy
     return bbnu*1e23
 
 def plancknu_units(nu, temp):
     """
     Calculate the planck function at a frequency and temperature
-    Temperature can be an array.
+    Temperature can NOT be an array.
+    Frequency can be an array.
     
     Input
     -----
@@ -133,9 +140,6 @@ def plancknu_units(nu, temp):
     """
     #~ import adapy.libs.cgsconst as _cgs
     # new imports
-    from scipy import exp, ones_like
-    import astropy.constants as co
-    import astropy.units as un
     #~ print nu, temp
     try:
        tmp1 = nu.unit 
@@ -148,29 +152,91 @@ def plancknu_units(nu, temp):
     x =(co.h.cgs*nu)/(co.k_B.cgs*temp) # dimensionless
     #bbnu = 2.0*hh*nu*nu*nu/(cc*cc)*(1.0/(np.exp( (hh*nu)/(kk*temp)) - 1.0))
     try:    # assume temp is an array
-        bbnu = ones_like(temp)
+        #~ bbnu = ones_like(temp.value)
         bbnu = 2.0 * co.h.cgs * nu**3/(co.c.cgs**2)*(1.0/(exp(x) - 1.0))
         # make sure we correct the function the same as if INT
         bbnu[x == 0] = 0.0
-        ind = x < 1e-5 
-        bbnu[ind] = 2.0 * nu**2 * co.k_B.cgs * temp[ind] / co.c.cgs**2
-        ind = x > 20.0
-        bbnu[ind] = 2.0 * co.h.cgs * nu**3 / co.c.cgs**2 * exp(-1.0*x[ind])
+        #~ ind = x < 1e-5 
+        #~ bbnu[ind] = 2.0 * nu**2 * co.k_B.cgs * temp[ind] / co.c.cgs**2
+        #~ ind = x > 20.0
+        #~ bbnu[ind] = 2.0 * co.h.cgs * nu**3 / co.c.cgs**2 * exp(-1.0*x[ind])
     except (TypeError): # if TypeError is raised, its an integer
                         # so treat it like one
-        #~ print x
         if x.value == 0:
             bbnu = 0.0
-        elif x.value < 1e-5:
-            bbnu = 2.0 * nu**2 * co.k_B.cgs * temp / co.c**2
-        elif x.value > 20.0:
-            bbnu = 2.0 * co.h.cgs * nu**3 / (co.c.cgs**2) * exp(-1.0*x)
         else:
-            bbnu = 2.0 * co.h.cgs * nu**3 / (co.c.cgs**2)*(1.0/(exp(x) - 1.0))
+            bbnu = 2.0 * co.h.cgs * nu**3 / (co.c.cgs**2)*(1.0/(exp(x) - 1.0))    
+        #~ if x.value == 0:
+            #~ bbnu = 0.0
+        #~ elif x.value < 1e-5:
+            #~ bbnu = 2.0 * nu**2 * co.k_B.cgs * temp / co.c**2
+        #~ elif x.value > 20.0:
+            #~ bbnu = 2.0 * co.h.cgs * nu**3 / (co.c.cgs**2) * exp(-1.0*x)
+        #~ else:
+            #~ bbnu = 2.0 * co.h.cgs * nu**3 / (co.c.cgs**2)*(1.0/(exp(x) - 1.0))
     return bbnu.to(un.Jy)
 
+def rayleigh_jeans_approx(nu, temp):
+    """
+    Rayleigh-Jeans Approximation of the Planck Law
+    Tested against plancknu above, seems legit, can reproduce 
+    Wikipedia figure at least...
+    """
+    if size(temp) > 1 :
+        raise StandardError('Temperature cannot be an array')
+    x =(co.h.cgs.value*nu)/(co.k_B.cgs.value*temp)
+    try:    # assume nu is an array
+        # Rayleigh-Jeans approximation (? low frequencies)
+        if all(x < 1e-5):
+            bbnu = 2.0 * nu**2 * co.k_B.cgs.value * temp / (co.c.cgs.value**2)
+        else:
+            raise StandardError('Rayleigh-Jeans approximation not applicable to all elements of input')
+    except (TypeError): # if TypeError is raised, its an integer
+                        # so treat it like one
+        # Rayleigh-Jeans approximation (? low frequencies)
+        if x < 1e-5:
+            bbnu = 2.0 * nu**2 * co.k_B.cgs.value * temp / (co.c.cgs.value**2)
+        else:
+            raise StandardError('Rayleigh-Jeans approximation not applicable to input')
+    # return Jy
+    return bbnu*1e23
+    
+def wiens_approx(nu, temp):
+    """
+    Wiens Approximation of the Planck Law
+    Tested against plancknu above, seems legit, can reproduce 
+    Wikipedia figure at least...
+    """
+    if size(temp) > 1 :
+        raise StandardError('Temperature cannot be an array')
+    x =(co.h.cgs.value*nu)/(co.k_B.cgs.value*temp)
+    try:    # assume nu is an array
+        # Wiens approximation (? high frequencies)
+        if all(x > 20.0):
+            bbnu = 2.0 * co.h.cgs.value * nu**3 / (co.c.cgs.value**2) * exp(-1.0*x)
+        else:
+            raise StandardError('Wiens approximation not applicable to all elements of input')
+    except (TypeError): # if TypeError is raised, its an integer
+                        # so treat it like one
+        # Wiens approximation (? high frequencies)
+        if x > 20.0:
+            bbnu = 2.0 * co.h.cgs.value * nu**3 / (co.c.cgs.value**2) * exp(-1.0*x)
+        else:
+            raise StandardError('Wiens approximation not applicable to input')
+    # return Jy
+    return bbnu*1e23
+    
+def plancknu_tarray(nu, temp):
+    """
+    Calculate the Planck Law for frequency(ies) and temperature(s)
+    i.e. temperature CAN be an array here
+    """
+    plancks = array([plancknu(nu, t) for t in temp])
+    return plancks
+
+
 # create wavelength grid
-def create_wavelength_grid(wbound = [0.01, 7., 50., 5.0e4], nwpoint = [50, 40, 40]):
+def create_wavelength_grid(wl_interval = [0.01, 7., 50., 5.0e4], npoints = [50, 40, 40]):
     """
     
     Creates a wavlength grid with different number of points
@@ -181,21 +247,25 @@ def create_wavelength_grid(wbound = [0.01, 7., 50., 5.0e4], nwpoint = [50, 40, 4
     Output units in Hz and micro meter
     
     """
-    nwav = nwpoint[0]
+    #~ np = npoints[0]
     # Magnus : what the hell is going on here?!?!
     # A frequency grid is created, with extra points 
-    wav0  = wbound[0] * (wbound[1]/wbound[0])**(arange(nw[0], dtype=float64) / nw[0])
-    for ipart in range(1,len(nw)-1): 
-        dum      = wbound[ipart] * (wbound[ipart+1]/wbound[ipart])**(arange(nw[ipart], dtype=float64) / nw[ipart])
+    # with some kind of spacing...
+    # TODO : make this better (pythonic) and explain more...
+    wav  = wl_interval[0] * (wl_interval[1]/wl_interval[0])**(arange(npoints[0], dtype='float64') / npoints[0])
+    for ipart in range(1,len(npoints)-1): 
+        dum = wl_interval[ipart] * (wl_interval[ipart+1]/wl_interval[ipart])**(arange(npoints[ipart], dtype='float64') / npoints[ipart])
         wav = np.append(wav, dum)
     
-    ipart      = len(nw)-1
-    dum        = wbound[ipart] * (wbound[ipart+1]/wbound[ipart])**(arange(nw[ipart], dtype=float64) / (nw[ipart]-1.))
-    wav   = np.append(wav, dum)
+    ipart = len(npoints)-1
+    dum = wl_interval[ipart] * (wl_interval[ipart+1]/wl_interval[ipart])**(arange(npoints[ipart], dtype='float64') / (npoints[ipart]-1.))
+    wav = np.append(wav, dum)
     # number of wavelength points
     nwav  = wav.shape[0]
     # convert wavelength in microns to frequency in Hz
-    freq  = cc / (wav*1e-4)
+    # convert speed of light to micrometer / s, i.e. same length
+    # unit as 'wav'
+    freq  = (co.c.to(un.um/un.s)).value / wav
     # number of frequency points
     nfreq = nwav
     #
@@ -213,7 +283,10 @@ def create_wavelength_grid(wbound = [0.01, 7., 50., 5.0e4], nwpoint = [50, 40, 4
 # read opacities
 
 def get_opac(infile = None):
-    """# Read opacities"""
+    """
+    Read opacities
+        
+    """
     #~ opacdir = '/disks/chem9/harsono/opacities/'
     finp = os.path.join(OPACDIR, infile)
     
@@ -230,7 +303,7 @@ def get_opac(infile = None):
         print 'Found NaNs...'
         data = np.delete(data,isubs,0)
     
-    return {'lam':data[:,0],'kabs':(data[:,1]),'kscat':(data[:,2])}
+    return {'lam':data[:,0],'kabs':(data[:,1]),'ksca':(data[:,2])}
 
 # interpolate_opacities - what it says, interpolate a given set of 
 #   opactities at given wavelength to another grid of wavelengths
@@ -244,8 +317,8 @@ def interpolate_opacities(opac = None, freq = None):
     Takes one dictionary (opacities) and one array (frequencies) 
     as input.
     
-    This could be optimize/simplified a bit using array operations 
-    and/or built in interoplation function, but I wont to it now...
+    This could probably be optimize/simplified a bit using array operations 
+    and/or built in interoplation function, but I wont do it now...
     
     """
     try:
@@ -258,7 +331,9 @@ def interpolate_opacities(opac = None, freq = None):
     kabs = zeros(nfreq)
     kscat = zeros(nfreq)
     
-    wl_micron = cc/freq * 1e4 # microns
+    wl_micron = co.c.to(un.um/un.s).value/freq # microns
+    # check...
+    #~ print co.c.cgs.value / freq * 1e4 - wl_micron # microns
     
     for ifreq in range(nfreq):        
         lampk = wl_micron[ifreq]
@@ -332,9 +407,8 @@ def transphere_write_frequencyfile(freq):
         fout.write('%13.7e\n'%(freq[inu]))
     fout.close()
 
-
 # find kappa at 550 nm
-def find_kappa_550nm(opac);
+def find_kappa_550nm(opac):
     """
     Find kappa at 550 nm
     
@@ -350,7 +424,7 @@ def find_kappa_550nm(opac);
 # construct the radial grid
 # this is for transphere at the moment, have to eval. different
 # software, might need different points
-def transphere_make_r_grid(rin=1., rout=1000., rref=100., nout=50,, nin=10):
+def transphere_make_r_grid(rin=1., rout=1000., rref=100., nout=50, nin=10):
     """
     Create logarithmically spaced grid with refinement
     If you want without refinement, just run
@@ -428,7 +502,7 @@ def transphere_calculate_density(r, rho0, plrho, g2d=100.):
         
     """
     # Correct the density profile
-    rho = rho0 / g2d * (r/r0)**(prlho)
+    rho = rho0 / float(g2d) * (r/float(r0))**(prlho)
     return rho
 
 # calculate the opacity tau
