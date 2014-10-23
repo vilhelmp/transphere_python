@@ -5,7 +5,7 @@ import sys as _sys
 import subprocess as _subprocess
 import scipy as _scipy
 from matplotlib import pyplot as _plt
-from . import cgsconst as _cgs
+#~ from . import cgsconst as _cgs
 
 
 
@@ -692,7 +692,13 @@ class Make(object):
             #~ ind = (self.Envstruct.temp >= self.t_uplim).nonzero()[0]
             self.Envstruct.temp[ind] = self.Envstruct.temp[max(ind)]
         
-
+class Transphere(object):
+    
+    
+    def __init__(self, modelfile = 'trans_input.inp'):
+        
+        
+        return None
 
 ########################################################################
 # MODELING HELP FUNCTIONS

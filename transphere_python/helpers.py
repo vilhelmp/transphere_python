@@ -1,9 +1,11 @@
 
 import errno
-import os as os
+import os
 import scipy as sp
 import numpy as np
-from scipy import log10, arange, array, exp, pi, ones_like, zeros, size
+from scipy import log10, arange, array, exp, pi, ones_like, zeros
+from scipy import zeros_like, size, concatenate
+from ConfigParser import SafeConfigParser
 
 # try to import AstroPy, if not raise ImportError with msg
 try:
@@ -58,12 +60,16 @@ class ChangeDirectory:
 # wavelength (microns), k_scattering, k_absorption
 OPACDIR = "opacities"
 
+# directory of script
+__location__ = os.path.realpath(
+    os.path.join(os.getcwd(), os.path.dirname(__file__)))
+
 pc2au = 206264.806 # 1 PC in AU, or arcsecond in ???
 # 206264.806 is also the number of arcsecs in a circle / 2pi
 
 deg2rad = lambda deg : deg * pi / 180
-
 rad2deg  = lambda rad : rad * 180 / pi
+
 
 def minmax(arr):
     return [arr.min(), arr.max()]
@@ -234,9 +240,8 @@ def plancknu_tarray(nu, temp):
     plancks = array([plancknu(nu, t) for t in temp])
     return plancks
 
-
 # create wavelength grid
-def create_wavelength_grid(wl_interval = [0.01, 7., 50., 5.0e4], npoints = [50, 40, 40]):
+def create_wavelength_grid(wl_interval = [0.01, 7., 50., 5.0e4], wl_points = [50, 40, 40]):
     """
     
     Creates a wavlength grid with different number of points
@@ -252,13 +257,13 @@ def create_wavelength_grid(wl_interval = [0.01, 7., 50., 5.0e4], npoints = [50, 
     # A frequency grid is created, with extra points 
     # with some kind of spacing...
     # TODO : make this better (pythonic) and explain more...
-    wav  = wl_interval[0] * (wl_interval[1]/wl_interval[0])**(arange(npoints[0], dtype='float64') / npoints[0])
+    wav  = wl_interval[0] * (wl_interval[1]/wl_interval[0])**(arange(wl_points[0], dtype='float64') / wl_points[0])
     for ipart in range(1,len(npoints)-1): 
-        dum = wl_interval[ipart] * (wl_interval[ipart+1]/wl_interval[ipart])**(arange(npoints[ipart], dtype='float64') / npoints[ipart])
+        dum = wl_interval[ipart] * (wl_interval[ipart+1]/wl_interval[ipart])**(arange(wl_points[ipart], dtype='float64') / wl_points[ipart])
         wav = np.append(wav, dum)
     
     ipart = len(npoints)-1
-    dum = wl_interval[ipart] * (wl_interval[ipart+1]/wl_interval[ipart])**(arange(npoints[ipart], dtype='float64') / (npoints[ipart]-1.))
+    dum = wl_interval[ipart] * (wl_interval[ipart+1]/wl_interval[ipart])**(arange(wl_points[ipart], dtype='float64') / (wl_points[ipart]-1.))
     wav = np.append(wav, dum)
     # number of wavelength points
     nwav  = wav.shape[0]
@@ -281,21 +286,18 @@ def create_wavelength_grid(wl_interval = [0.01, 7., 50., 5.0e4], npoints = [50, 
     return freq, lam
 
 # read opacities
-
 def get_opac(infile = None):
     """
     Read opacities
         
     """
-    #~ opacdir = '/disks/chem9/harsono/opacities/'
-    finp = os.path.join(OPACDIR, infile)
+    finp = os.path.join(__location__, OPACDIR, infile)
     
     try:
         data = np.genfromtxt(finp, skip_header=3, comments='#',invalid_raise=False)
     except StandardError:
-        os.system('ls %s'%opacdir)
-        print 'Cannot find the opacfile'
-        sys.exit()
+        os.system('ls {0}'.format(OPACDIR))
+        raise StandardError('Cannot find the opacfile')
 
     # find the nans
     isubs = (np.isnan(data[:,0])).nonzero()[0]
@@ -308,7 +310,6 @@ def get_opac(infile = None):
 # interpolate_opacities - what it says, interpolate a given set of 
 #   opactities at given wavelength to another grid of wavelengths
 #   should be able to extrapolate a constant or something...
-
 def interpolate_opacities(opac = None, freq = None):
     """
     Function grabbed from Daniel Harsono's file: transphere_helpers.py
@@ -373,11 +374,15 @@ def interpolate_opacities(opac = None, freq = None):
 def transphere_write_opacfile(nf = -1,opac=-1):
     """
     Write the opacity input files
+    
+    Grabbed from Daniel Harsono's code, some modernizations 
+    implemented...
+    
     """
     if nf == -1:
-        print 'nf is not define here....'
-        sys.exit()
-        
+        raise StandardError('nf is not define here....')
+    
+    # write the dustopac.inp file, will overwrite existing files
     fout = file('dustopac.inp','w')
     fout.write('1               Format number of this file\n')
     fout.write('1               Nr of dust species\n')
@@ -387,24 +392,23 @@ def transphere_write_opacfile(nf = -1,opac=-1):
     fout.write('----------------------------------------------------------------------------\n')
     fout.close()
     
-    # write the dustopac_1
-    
+    # write the dustopac_1, will overwrite existing files
     fout = file('dustopac_1.inp','w')
-    fout.write('%d  1 \n'%nf)
-    fout.write('\n')
-    for inu in range(nf):
-        fout.write('%13.6f\n'%(opac['kabs'][inu]))
-    for inu in range(nf):
-        fout.write('%13.6f\n'%(0.0))
+    fout.write('{0}  1 \n\n'.format(int(nf))) # NB two line breaks here.
+    fout.writelines(['{0:13.6f}\n'.format(i) for i in opac['kabs']])
+    fout.writelines(['{0:13.6f}\n'.format(i) for i in zeros_like(opac['kabs'])])
     fout.close() 
 
 # write frequency file
 def transphere_write_frequencyfile(freq):
     fout = file('frequency.inp','w')
-    fout.write('%d \n'%(freq.shape[0]))
-    fout.write('\n')
-    for inu in range(nfreq):
-        fout.write('%13.7e\n'%(freq[inu]))
+    fout.write('{0} \n\n'.format(int(len(freq))))
+    #~ fout.write('%d \n'%(freq.shape[0]))
+    #~ fout.write('\n')
+    fout.writelines( ['{0:13.7f}\n'.format(f) for f in freq] )
+    #~ fout.writelines( ['{0:e}\n'.format(f) for f in freq] )
+    #~ for inu in range(nfreq):
+        #~ fout.write('%13.7e\n'%(freq[inu]))
     fout.close()
 
 # find kappa at 550 nm
@@ -414,11 +418,33 @@ def find_kappa_550nm(opac):
     
     Remember : nm 1e-9, microns 1e-6 i.e. 550 nm = 0.55 microns
     
+    Only works if 'lam' in the opac dictionary, and its increasing
+    
+    Just a linear interpolation between the nearest points to 0.55 nm
+    could perhaps be done more robust, i.e. independent of the 
+    direction of 'lam'
     """
+    
+    
     lam0 = 0.55 # in microns
-    ivis = (opac['lam'] > lam0).nonzero()[0][-1]+1 # smaller than lam0
+    # this doesn't make sense either
+    # ivis will now be the next after the last element in the opac['lam']
+    # array. i.e. nonexistent! raising an error later in the eps calc
+    #~ ivis = (opac['lam'] > lam0).nonzero()[0][-1]+1 # smaller than lam0
+    # I removed the +1 and then it works, of course.
+    # I now also changed to grab the first element, because
+    # I think we want the position where the lam~0.55 nm? 
+    # where lam>0.55 holds, so this indes-1 is where we want to look
+    ivis = (opac['lam'] > lam0).nonzero()[0][0]
     eps = (lam0 - opac['lam'][ivis]) / (opac['lam'][ivis-1] - opac['lam'][ivis])
-    kappa = (1.0*eps) * opac['kabs'][ivis-1] + eps * opac['kabs'][ivis]
+    kappa1 = float(eps) * ( opac['kabs'][ivis-1] + opac['kabs'][ivis] )
+    
+    
+    # alternative... linear interpolation
+    m = (opac['kabs'][ivis-1] - opac['kabs'][ivis]) / (opac['lam'][ivis-1] - opac['lam'][ivis])
+    kappa = m * (lam0 - opac['lam'][ivis-1]) + opac['kabs'][ivis-1]
+    print('Daniels interpolation? {0:f}, Linear interpolation : {1:f}'.format(kappa1, kappa))
+    
     return kappa
 
 # construct the radial grid
@@ -495,15 +521,48 @@ def transphere_make_r_grid(rin=1., rout=1000., rref=100., nout=50, nin=10):
     return r
 
 # calculate the dust density given the radial grid    
-def transphere_calculate_density(r, rho0, plrho, g2d=100.):
+def transphere_calculate_density(r, n0=4.9e8, r0=35.9, plrho=-1.7, g2d=100., rho0=None):
     """
     calculate the dust density as
     rho = rho0 / g2d * (r/r0)**(prlho)
-        
+    
+    Input
+    -----
+    r       : radial grid
+    n0      : h2 number density at r0
+    r0      : reference radius (same unit as 'r')
+    plrho   : powerlaw exponent, including if it's negative
+    g2d     : gas to dust ratio, default = 100.
+    rho0    : if you want to input the dust density at r0
+              you can do that
+    
+    
+    Output
+    ------
+    tuple with (n_h2, rho_gas, rho_dust)
+    
+    
     """
     # Correct the density profile
-    rho = rho0 / float(g2d) * (r/float(r0))**(prlho)
-    return rho
+    r_dependence  = (r/r0)**(plrho)
+    # n0 is in nh2 / cm3
+    #    g/cm3           nh2 / cm3 * amu/h2 * mass of amu(g)
+    #~ self.rho0_gas = self.n0 * _cgs.MUH2 * _cgs.MP   # g * cm-3
+    # all gas, MUH2 is including H2+He+Metals
+    # apply the radial dependence to the gas density
+    #~ self.rho_gas = self.rho0_gas * r_dependence     # g * cm-3
+    # apply radial dependence to the H2 number density
+    muh2 = 2.3
+    if n0:
+        n_h2 = n0 * r_dependence              # nh2 * cm-3
+        rho_gas = n_h2 * muh2 * co.m_p.cgs.value  # g * cm-3
+    elif rho0:
+        rho_gas = rho0 * r_dependence
+        n_h2 = rho_gas / ( muh2 * co.m_p.cgs.value )
+    else:
+        raise StandardError('Need either \'n0\', or \'rho0\'')
+    rho_dust = rho_gas / g2d  # g * cm-3
+    return (n_h2, rho_gas, rho_dust)
 
 # calculate the opacity tau
 def transphere_calculate_tau(r, rho, kappa):
@@ -519,6 +578,59 @@ def transphere_calculate_tau(r, rho, kappa):
     return tau
 
 
+def read_transphere_modelfile(modelfile):
+    """
+    Read the Transphere model file. Compatible with
+    ConfigParser.SafeConfigParser.
+    Input explained in the provided example file. Minimum example below
+        [model]
+        rstar =  5.97
+        mstar = 1.
+        tstar = 5780.  
+        nin = 10
+        nout = 60
+        rref = 100
+        rin = 35.9 
+        rout = 17500.
+        n0 = 4.9E8    
+        plrho = -1.7
+        r0 = 35.9
+        opacfile = oh5_draine.dat
+        wl_interval = 0.01, 7.0, 50.0, 5e4
+        wl_points = 50, 40, 40
+
+        [settings]
+        plot = False
+        nriter = 20
+        convcrit = 1e-06
+        ncst = 10
+        ncex = 30
+        ncnr = 1
+        itypemw = 1
+        idump = 1
+
+    
+    """
+    parser = SafeConfigParser()
+    parser.read(modelfile)
+    
+    model = dict(parser.items('model'))
+    settings = dict(parser.items('settings'))
+    
+    # convert relevant input in model
+    model['wl_interval'] = [float(i) for i in model['wl_interval'].split(',')]
+    model['wl_points'] = [int(i) for i in model['wl_points'].split(',')]
+    model['nin'] = int(model['nin'])
+    model['nout'] = int(model['nout'])
+    model['rref'] = float(model['rref'])
+    model['rin'] = float(model['rin'])
+    model['rout'] = float(model['rout'])
+    model['n0'] = float(model['n0'])
+    model['plrho'] = float(model['plrho'])
+    
+    # convert relevant input in settings
+    settings['plot'] = bool(settings['plot'])
+    return model, settings
 
 
 
