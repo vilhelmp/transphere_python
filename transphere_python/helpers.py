@@ -55,7 +55,6 @@ class ChangeDirectory:
     def __exit__(self, etype, value, traceback):
         os.chdir(self.savedPath)
 
-
 # path to the opacities directory with the .dat file containting
 # wavelength (microns), k_scattering, k_absorption
 OPACDIR = "opacities"
@@ -258,11 +257,11 @@ def create_wavelength_grid(wl_interval = [0.01, 7., 50., 5.0e4], wl_points = [50
     # with some kind of spacing...
     # TODO : make this better (pythonic) and explain more...
     wav  = wl_interval[0] * (wl_interval[1]/wl_interval[0])**(arange(wl_points[0], dtype='float64') / wl_points[0])
-    for ipart in range(1,len(npoints)-1): 
+    for ipart in range(1,len(wl_points)-1): 
         dum = wl_interval[ipart] * (wl_interval[ipart+1]/wl_interval[ipart])**(arange(wl_points[ipart], dtype='float64') / wl_points[ipart])
         wav = np.append(wav, dum)
     
-    ipart = len(npoints)-1
+    ipart = len(wl_points)-1
     dum = wl_interval[ipart] * (wl_interval[ipart+1]/wl_interval[ipart])**(arange(wl_points[ipart], dtype='float64') / (wl_points[ipart]-1.))
     wav = np.append(wav, dum)
     # number of wavelength points
@@ -539,7 +538,7 @@ def transphere_calculate_density(r, n0=4.9e8, r0=35.9, plrho=-1.7, g2d=100., rho
     
     Output
     ------
-    tuple with (n_h2, rho_gas, rho_dust)
+    n_h2, rho_gas, rho_dust
     
     
     """
@@ -562,7 +561,7 @@ def transphere_calculate_density(r, n0=4.9e8, r0=35.9, plrho=-1.7, g2d=100., rho
     else:
         raise StandardError('Need either \'n0\', or \'rho0\'')
     rho_dust = rho_gas / g2d  # g * cm-3
-    return (n_h2, rho_gas, rho_dust)
+    return n_h2, rho_gas, rho_dust
 
 # calculate the opacity tau
 def transphere_calculate_tau(r, rho, kappa):
@@ -583,6 +582,9 @@ def read_transphere_modelfile(modelfile):
     Read the Transphere model file. Compatible with
     ConfigParser.SafeConfigParser.
     Input explained in the provided example file. Minimum example below
+    
+    Input
+    -----
         [model]
         rstar =  5.97
         mstar = 1.
@@ -607,16 +609,23 @@ def read_transphere_modelfile(modelfile):
         ncex = 30
         ncnr = 1
         itypemw = 1
-        idump = 1
-
+        idump = 1    
+    
+    Output
+    ------
+    dict(), dict()
+    
+    Two dictionaries representing the [model] and [settings]
+    sections in the input file. Some of the values in the dictionaries
+    have been converted to relevant Python types.
     
     """
+    # use the SafeConfigParser to read in the model file.
     parser = SafeConfigParser()
     parser.read(modelfile)
-    
+    # Store the two available sections in their own dictionaries
     model = dict(parser.items('model'))
     settings = dict(parser.items('settings'))
-    
     # convert relevant input in model
     model['wl_interval'] = [float(i) for i in model['wl_interval'].split(',')]
     model['wl_points'] = [int(i) for i in model['wl_points'].split(',')]
@@ -626,13 +635,52 @@ def read_transphere_modelfile(modelfile):
     model['rin'] = float(model['rin'])
     model['rout'] = float(model['rout'])
     model['n0'] = float(model['n0'])
+    model['r0'] = float(model['r0'])
     model['plrho'] = float(model['plrho'])
-    
+    model['tbg'] = float(model['tbg'])
+    model['dpc'] = float(model['dpc'])
+    try:
+        model['g2d'] = model['g2d']
+    except KeyError:
+        print ('gas to dust ration not given, assume 100 ')
+        print ('If you want to tweak this, add \'g2d\' to model section')
+        model['g2d'] = 100.
     # convert relevant input in settings
     settings['plot'] = bool(settings['plot'])
+    
+    # return 
     return model, settings
 
-
-
+####################
+# write function
+def write_opac(nf = -1,opac=-1, directory=None):
+    """
+    Write the opacity input files
+    """
+    if nf == -1:
+        print 'nf is not define here....'
+        sys.exit()
+        
+    fout = file('dustopac.inp','w')
+    fout.write('1               Format number of this file\n')
+    fout.write('1               Nr of dust species\n')
+    fout.write('============================================================================\n')
+    fout.write('-1              Way in which this dust species is read (-1=file)\n')
+    fout.write('1               Extension of name of dustopac_***.inp file\n')
+    fout.write('----------------------------------------------------------------------------\n')
+    fout.close()
+    
+    # write the dustopac_1
+    
+    fout = file('dustopac_1.inp','w')
+    fout.write('%d  1 \n'%nf)
+    fout.write('\n')
+    for inu in range(nf):
+        fout.write('%13.6f\n'%(opac['kabs'][inu]))
+    for inu in range(nf):
+        fout.write('%13.6f\n'%(0.0))
+    fout.close()
+    
+    print 'FINISH Opacs'
 
 

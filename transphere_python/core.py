@@ -1,50 +1,17 @@
 
 
-import os as _os
-import sys as _sys
-import subprocess as _subprocess
-import scipy as _scipy
-from matplotlib import pyplot as _plt
-#~ from . import cgsconst as _cgs
-
-
-
-#nice line settings
-NiceLineSettings = dict(lw=1, ms=3, mew=0, marker='o')
-
-
-########################################################################
-# new code
+import os as os
+import sys as sys
+import subprocess as subprocess
+import scipy as scipy
+from scipy import pi
+from time import time, sleep
+from matplotlib import pyplot as plt; plt.ion()
 
 from .helpers import *
 
-# pseudo at the moment
-# list of things that it should do.
-# how do I implement this best?
-
-# get parameters
-# parse/check parameters
-
-###Create various things###
-# create frequency grid from parameters
-# create_wavelength_grid(wbound = [0.01, 7., 50., 5.0e4], nwpoint = [50, 40, 40])
-# read the opacity table
-# interpolate opacity table to frequency grid
-# find kappa at 550 nm (why?)
-# create radial grid
-# calculate density profile
-# calculate tau
-###Write all stuff to disk###
-# write frequency file
-# write opacity input
-# write 'transphere.inp' file
-# write 'starinfo.inp' file
-# write 'starspectrum.inp' file
-# write 'external_meanint.inp' file
-# write 'envstruct.inp' file
-# run transphere
-# read in results
-# plot results
+#nice line settings
+NiceLineSettings = dict(lw=1, ms=3, mew=0, marker='o')
 
 
 
@@ -513,10 +480,10 @@ class Make(object):
                     'Please optimize code and check it.')
             if 'nr' not in kwargs:
                 sysexit('Number of radial shells, \"nr\" not given as input.')
-            _os.system('rm -f dustopac_1.inp')
-            _os.system('rm -f dustopac.inp') # added this, do I really need
+            os.system('rm -f dustopac_1.inp')
+            os.system('rm -f dustopac.inp') # added this, do I really need
                                             # to remove it too?
-            f = open(_os.path.join(self.directory, 'dustopac.inp'), 'w')
+            f = open(os.path.join(self.directory, 'dustopac.inp'), 'w')
             f.write('1               Format number of this file'+'\n')
             f.write('1               Nr of dust species'+'\n')
             f.write('============================================================================'+'\n')
@@ -524,7 +491,7 @@ class Make(object):
             f.write('0               Extension of name of dustopac_***.inp file'+'\n')
             f.write('----------------------------------------------------------------------------'+'\n')
             f.close
-            f = open(_os.path.join(self.directory, 'dustopac_0.inp'), 'w')
+            f = open(os.path.join(self.directory, 'dustopac_0.inp'), 'w')
             f.write(nr)
             f.write(str(nf)+' 1\n')
             f.write(' ')
@@ -539,17 +506,17 @@ class Make(object):
             f.close
         elif not self.localdust:
             # first remove the standard ratran dust opacity input files
-            _os.system('rm -f {0}'.format(_os.path.join(self.directory, 'dustopac_0.inp')))
-            _os.system('rm -f {0}'.format(_os.path.join(self.directory, 'dustopac.inp'))) # added this, do I really need
+            os.system('rm -f {0}'.format(os.path.join(self.directory, 'dustopac_0.inp')))
+            os.system('rm -f {0}'.format(os.path.join(self.directory, 'dustopac.inp'))) # added this, do I really need
                                             # to remove it too?
-            with open(_os.path.join(self.directory, 'dustopac.inp'),'w') as f:
+            with open(os.path.join(self.directory, 'dustopac.inp'),'w') as f:
                 f.write('1               Format number of this file\n')
                 f.write('1               Nr of dust species\n')
                 f.write('============================================================================\n')
                 f.write('-1              Way in which this dust species is read (-1=file)\n')
                 f.write('1               Extension of name of dustopac_***.inp file\n')
                 f.write('----------------------------------------------------------------------------\n')
-            with open(_os.path.join(self.directory, 'dustopac_1.inp'), 'w') as f:
+            with open(os.path.join(self.directory, 'dustopac_1.inp'), 'w') as f:
                 f.write(str(self.Opacity.nf)+' 1\n \n')
                 for inu in range(0, self.Opacity.nf):
                     f.write(str(self.Opacity.cabs[inu][0])+'\n')
@@ -569,14 +536,14 @@ class Make(object):
                 self.ncnr,
                 self.itypemw,
                 int(self.idump)))
-        with open(_os.path.join(self.directory, 'transphere.inp'),'w') as f:
+        with open(os.path.join(self.directory, 'transphere.inp'),'w') as f:
             f.write(text)
         #
         # Make the stellar information file
         # (mstar and tstar are irrelevant; they are there for historical reasons)
         # isn't "tstar" used for planck calc?
         #~ f=open('starinfo.inp','w')
-        with open(_os.path.join(self.directory, 'starinfo.inp'),'w') as f:
+        with open(os.path.join(self.directory, 'starinfo.inp'),'w') as f:
             f.write('1\n'
                     '{0}\n'
                     '{1}\n'
@@ -588,7 +555,7 @@ class Make(object):
         #
         #~ f=open('starspectrum.inp','w')
         sspec = (self.rstar / _cgs.PC)**2 * pi * bplanck(self.freq, self.tstar)
-        with open(_os.path.join(self.directory, 'starspectrum.inp'), 'w') as f:
+        with open(os.path.join(self.directory, 'starspectrum.inp'), 'w') as f:
             f.write('{0}\n'.format(len(self.freq)))
             for inu in range(0,len(self.freq)):
                 f.write('{0:20}\t{1:20}\n'.format(self.freq[inu], sspec[inu]))
@@ -607,14 +574,14 @@ class Make(object):
         else:
             if self.tbg > 0: bgspec = bplanck(self.freq, self.tbg) * self.isrf
 
-        with open(_os.path.join(self.directory, 'external_meanint.inp'), 'w') as f:
+        with open(os.path.join(self.directory, 'external_meanint.inp'), 'w') as f:
             f.write('{0}\n'.format(len(self.freq)))
             for inu in range(0, len(self.freq)):
                 f.write('{0:20}\t{1:20}\n'.format(self.freq[inu], bgspec[inu]))
         #
         # Write the envelope structure
         #
-        with open(_os.path.join(self.directory, 'envstruct.inp'),'w') as f:
+        with open(os.path.join(self.directory, 'envstruct.inp'),'w') as f:
             f.write(str(len(self.radii))+'\n')
             f.write(' '+'\n')
             # rho_dust has unit g/cm3
@@ -696,26 +663,244 @@ class Transphere(object):
     
     
     def __init__(self, modelfile = 'trans_input.inp'):
+        # read in the model parameters and convert some of them
+        # to relevant types
+        model, settings = read_transphere_modelfile(modelfile)
+        # create the wavelength grid
+        freq, lam = create_wavelength_grid(
+                    wl_interval = model['wl_interval'], 
+                    wl_points =  model['wl_points'])
+        # read the opacity table
+        raw_opacities = get_opac(infile = model['opacfile'])
+        # interpolate opacity table to frequency 
+        interp_opacities = interpolate_opacities(
+                opac = raw_opacities, 
+                freq = freq)
+        # find kappa at 550 nm (why?)        
+        kappa = find_kappa_550nm(raw_opacities)
+        # create radial grid        
+        r = transphere_make_r_grid(
+            rin = model['rin'], 
+            rout = model['rout'], 
+            rref = model['rref'], 
+            nout = model['nout'], 
+            nin = model['nin'])
+        # calculate density profile
+        n_h2, rho_gas, rho_dust = transphere_calculate_density(
+            r, 
+            n0 = model['n0'], 
+            r0= model['r0'], 
+            plrho = model['plrho'], 
+            g2d = model['g2d'],  # default is 100, is set in reader
+            rho0 = None)
+        # calculate tau
+        # kappa is dust opacities, so rho_dust should be input, right?
+        tau = transphere_calculate_tau(r, rho_dust, kappa)
         
+        # store some things as attributes
+        self.model = model
+        self.settings = settings
+        self.freq = freq 
+        self.lam = lam
+        self.raw_opacities = raw_opacities
+        self.interp_opacities = interp_opacities
+        self.kappa = kappa
+        self.r = r 
+        self.n_h2 = n_h2
+        self.rho_gas = rho_gas
+        self.rho_dust = rho_dust
+        self.tau = tau
+        self.directory = settings['dirname']
+        return None
+        
+    def write_input(self):
+        """
+        
+        Writes all input to a sub-directory provided in the 
+        setup file.
+        
+        """
+        # create dir
+        input_dir_path = os.path.join(os.getcwd(), self.directory)
+        if not make_dirs(input_dir_path): 
+            print('Directory exists, continuing.')
+
+        # Dustopacities
+        nf = len(self.freq)        
+        with open(os.path.join(self.directory, 'dustopac.inp'),'w') as f:
+            f.write('1               Format number of this file\n')
+            f.write('1               Nr of dust species\n')
+            f.write('============================================================================\n')
+            f.write('-1              Way in which this dust species is read (-1=file)\n')
+            f.write('1               Extension of name of dustopac_***.inp file\n')
+            f.write('----------------------------------------------------------------------------\n')
+            f.close()
+        
+        # write the dustopac_1 file
+        #TODO: need to update the writing here...
+        with open(os.path.join(self.directory, 'dustopac_1.inp'),'w') as f:
+            f.write('%d  1 \n'%nf)
+            f.write('\n')
+            for inu in range(nf):
+                f.write('%13.6f\n'%(self.interp_opacities['kabs'][inu]))
+            for inu in range(nf):
+                f.write('%13.6f\n'%(0.0))
+            f.close()
+    
+        
+        
+        
+        
+        # Transphere settings input file        
+        text = ('{0}\n{1}\n{2}\n{3}\n'
+                '{4}\n{5}\n{6}\n{7}'.format(2,
+                self.settings['nriter'],
+                self.settings['convcrit'],
+                self.settings['ncst'],
+                self.settings['ncex'],
+                self.settings['ncnr'],
+                self.settings['itypemw'],
+                int(self.settings['idump'])))
+        with open(os.path.join(self.directory, 'transphere.inp'),'w') as f:
+            f.write(text)
+        
+        # Frequency input file
+        text = ['{0}\n'.format(f) for f in self.freq ]
+        with open(os.path.join(self.directory, 'frequency.inp'),'w') as f:
+            f.writelines(text)
+
+        # Central star information 
+        with open(os.path.join(self.directory, 'starinfo.inp'),'w') as f:
+            f.write('1\n'
+                '{0}\n'
+                '{1}\n'
+                '{2}\n'.format(self.model['rstar'],
+                            self.model['mstar'],
+                            self.model['tstar']))
+    
+        # Stellar spectrum in the wavelength range, black body emission
+        # 'plancknu' gives output in Jy, multiply with 1e-23 std units
+        sspec = (float(self.model['rstar']) / co.pc.cgs.value)**2. * pi * \
+                plancknu(self.freq, float(self.model['tstar']))*1e-23     
+        text = ['{0:20}\t{1:20}\n'.format(i,j) for i,j in zip(self.freq, sspec)]
+        with open(os.path.join(self.directory, 'starspectrum.inp'), 'w') as f:
+            f.writelines(text)
+    
+        # interstellar radiation field
+        if float(self.model['tbg']) == 0.0 and not self.model.has_key('isrf'):
+            bgspec = zeros((len(self.freq)),float)
+        elif self.model.has_key('isrf'):
+            # read the isrf file in and store in bgspec
+            f = open(self.model['isrf'], 'r')
+            nf = int(f.readline().strip())
+            bgspec = zeros((len(self.freq)),float)
+            for ii in range(0,nf):
+                bgspec[ii] = float(f.readline().strip())
+            f.close()
+        elif self.model['tbg'] > 0: 
+                bgspec = plancknu(self.freq, float(self.model['tbg']) ) * 1e-23
+        
+        text = ['{0:20}\t{1:20}\n'.format(i,j) for i,j in zip(self.freq, bgspec)]
+        with open(os.path.join(self.directory, 'external_meanint.inp'), 'w') as f:
+            f.write('{0}\n'.format(len(self.freq)))
+            f.writelines(text)
+
+        with open(os.path.join(self.directory, 'envstruct.inp'),'w') as f:
+            f.write(str(len(self.r))+'\n')
+            f.write(' '+'\n')
+            # rho_dust has unit g/cm3
+            for ir in range(0,len(self.r)):
+                f.write("%13.6E %13.6E %13.6E\n" % (self.r[ir], self.rho_dust[ir], 0.e0))
+          
+        #Write all stuff to disk
+        # write frequency file# MODELING HELP FUNCTIONS
+        # write opacity inputdef bplanck(nu,T): # Returns the Spectral Radiance (Planck)
+        # write 'transphere.inp' file    from scipy import exp, constants
+        # write 'starinfo.inp' file    try:
+        # write 'starspectrum.inp' file        x = _cgs.HH*nu/(_cgs.KK*T)
+        # write 'external_meanint.inp' file        bpl = (2.0*_cgs.HH*nu**3/_cgs.CC**2)/(exp(x)-1.0)
+        # write 'envstruct.inp' file        return bpl
+        # run transphere    except (ZeroDivisionError):
+        # read in results        return 0
+        # plot results
         
         return None
 
-########################################################################
-# MODELING HELP FUNCTIONS
-def bplanck(nu,T): # Returns the Spectral Radiance (Planck)
-    from scipy import exp, constants
-    try:
-        x = _cgs.HH*nu/(_cgs.KK*T)
-        bpl = (2.0*_cgs.HH*nu**3/_cgs.CC**2)/(exp(x)-1.0)
-        return bpl
-    except (ZeroDivisionError):
-        return 0
+    def run(self, nice = 0):
+
+        
+        #
+        # re-check the input files here?
+        # at least the format?
+        #
+        print ('Running Transphere')
+        # temporarily change directory, if it has been initiated
+        # the directory should exist
+        with ChangeDirectory(self.directory): 
+            t1 = time()
+            if nice:
+                proc = subprocess.Popen(['nice', 'transphere'], 
+                                    stdout = subprocess.PIPE, 
+                                    stderr = subprocess.STDOUT)
+            elif not nice:
+                proc = subprocess.Popen(['transphere'], 
+                                    stdout = subprocess.PIPE, 
+                                    stderr = subprocess.STDOUT)
+            sys.stdout.write('Iteration no : ')
+            sys.stdout.flush() # flush output so we can write again
+            trans_out = []
+            while True:
+                # first : if process is done, break the loop
+                if proc.poll() != None: 
+                    break
+                nextline = proc.stdout.readline()
+                trans_out.append(nextline)
+                
+                if "Iteration" in nextline:
+                    # grab the iteration number
+                    iter_no = int(nextline[10:])
+                    sys.stdout.write('{0:3} \b\b\b\b'.format(iter_no)) # print out a point
+                    sys.stdout.flush()
+                    
+                #~ if "Error" in nextline:
+                    # if it is the error of the first iteration
+                    # we grab the error of it
+                    #~ if iter_no == 1:
+                        #~ start_error = float(nextline[13:])
+                        #~ first = 0 # now we are not at the first any longer
+                    # if it is not the first error, calculate per cent done
+                    #~ else:
+                        #~ current_error = float(nextline[13:])
+                        #~ diff1 = start_error - self.convcrit
+                        #~ diff2 = start_error - current_error
+                        #~ p_done = (diff2 / diff1 * 100)
+                        #~ sys.stdout.write(' {0} : {1}\r'.format(iter_no, p_done)) # print out a point
+                        #~ sys.stdout.flush()    # flush output so we can write again
+                #~ sleep(0.5)            # wait for 0.5 second
+                
+                #~ sys.stdout.write('Downloading File FooFile.txt [%d%%]\r'%i)
+                #~ ys.stdout.flush()
+
+            print('\nDone in {0:2.1f} seconds'.format((time()-t1)))
+        # now get the output as a string, so we can check stuff if
+        # we want to
+        self.transphere_output = ''.join(trans_out)
+        # read in the output-files, for checks, plots etc
+        self.Envstruct, self.Convhist = read_transphereoutput(self)
+        if self.t_uplim:
+            ind = (self.Envstruct.temp >= self.t_uplim).nonzero()[0]
+            self.Envstruct.temp[ind] = self.t_uplim
+        elif self.t_flat:
+            ind = (self.radii <= self.t_flat).nonzero()[0]
+            #~ ind = (self.Envstruct.temp >= self.t_uplim).nonzero()[0]
+            self.Envstruct.temp[ind] = self.Envstruct.temp[max(ind)]
+        
 
 def read_transphereoutput(self, ext = 0):
     from scipy import array
     if ext == 0: ext=''
     filetoread = 'envstruct' + ext + '.dat'
-    path_to_file = _os.path.join(self.directory, filetoread)
+    path_to_file = os.path.join(self.directory, filetoread)
     with open(path_to_file, 'r') as f:
         lines = f.read().split('\n')
     nr = int(lines[0])
@@ -723,7 +908,7 @@ def read_transphereoutput(self, ext = 0):
 
 
     filetoread = 'spectrum.dat'
-    path_to_file = _os.path.join(self.directory, filetoread)
+    path_to_file = os.path.join(self.directory, filetoread)
     with open(path_to_file, 'r') as f:
         lines = f.read().split('\n')
     nr = int(lines[0])
@@ -749,14 +934,14 @@ def read_transphereoutput(self, ext = 0):
 
     #~ import numpy as np
     filetoread = 'convhist.info'
-    path_to_file = _os.path.join(self.directory, filetoread)
+    path_to_file = os.path.join(self.directory, filetoread)
     f = open(path_to_file, 'r')
     nn = int(f.readline().strip().split()[0])
     f.close()
 
     # Convergence history
     filetoread = 'convhist.dat'
-    path_to_file = _os.path.join(self.directory, filetoread)
+    path_to_file = os.path.join(self.directory, filetoread)
     with open(path_to_file, 'r') as f:
         lines = f.read().split('\n')
     nr = int(lines[0].strip())
@@ -979,7 +1164,7 @@ def load_transphere(directory = '', filename = 'transpheremodel.pickle'):
     # load input object from filename in directory
     # and create the transphere object
     import pickle
-    with open(_os.path.join(directory, filename), 'r') as f:
+    with open(os.path.join(directory, filename), 'r') as f:
         inputdict = pickle.load(f)
     Obj = Transphere(**inputdict)
     # IDEA : add so that it loads the output(?) as well?
