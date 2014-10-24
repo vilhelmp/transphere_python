@@ -677,7 +677,7 @@ class Transphere(object):
                 opac = raw_opacities, 
                 freq = freq)
         # find kappa at 550 nm (why?)        
-        kappa = find_kappa_550nm(raw_opacities)
+        kappa = find_kappa(raw_opacities['lam'], raw_opacities['kabs'], lam0=550.0, localdust = model['localdust'])
         # create radial grid        
         r = transphere_make_r_grid(
             rin = model['rin'], 
@@ -696,7 +696,9 @@ class Transphere(object):
         # calculate tau
         # kappa is dust opacities, so rho_dust should be input, right?
         tau = transphere_calculate_tau(r, rho_dust, kappa)
-        
+        # stellar spectrum
+        #~ sspec=(model['rstar'] /nc.pc)**2*math.pi*astroProcs.bplanck(model['freq'],model['tstar'])
+        stellar_spec = (float(model['rstar']) * co.R_sun.cgs.value / co.pc.cgs.value)**2. * pi * plancknu(freq, float(model['tstar']))*1e-23     
         # store some things as attributes
         self.model = model
         self.settings = settings
@@ -710,6 +712,7 @@ class Transphere(object):
         self.rho_gas = rho_gas
         self.rho_dust = rho_dust
         self.tau = tau
+        self.stellar_spec = stellar_spec
         self.directory = settings['dirname']
         return None
         
@@ -725,8 +728,7 @@ class Transphere(object):
         if not make_dirs(input_dir_path): 
             print('Directory exists, continuing.')
 
-        # Dustopacities
-        nf = len(self.freq)        
+        # Dustopacities        
         with open(os.path.join(self.directory, 'dustopac.inp'),'w') as f:
             f.write('1               Format number of this file\n')
             f.write('1               Nr of dust species\n')
@@ -739,18 +741,13 @@ class Transphere(object):
         # write the dustopac_1 file
         #TODO: need to update the writing here...
         with open(os.path.join(self.directory, 'dustopac_1.inp'),'w') as f:
-            f.write('%d  1 \n'%nf)
-            f.write('\n')
-            for inu in range(nf):
+            f.write('{0}  1 \n\n'.format(len(self.freq)))
+            for inu in range(len(self.freq)):
                 f.write('%13.6f\n'%(self.interp_opacities['kabs'][inu]))
-            for inu in range(nf):
+            for inu in range(len(self.freq)):
                 f.write('%13.6f\n'%(0.0))
             f.close()
     
-        
-        
-        
-        
         # Transphere settings input file        
         text = ('{0}\n{1}\n{2}\n{3}\n'
                 '{4}\n{5}\n{6}\n{7}'.format(2,
@@ -765,27 +762,29 @@ class Transphere(object):
             f.write(text)
         
         # Frequency input file
-        text = ['{0}\n'.format(f) for f in self.freq ]
+        text = ['{0:13.7e}\n'.format(f) for f in self.freq ]
         with open(os.path.join(self.directory, 'frequency.inp'),'w') as f:
+            f.write('{0} \n\n'.format(len(self.freq)))
             f.writelines(text)
 
         # Central star information 
         with open(os.path.join(self.directory, 'starinfo.inp'),'w') as f:
+            # CGS units!
             f.write('1\n'
-                '{0}\n'
-                '{1}\n'
-                '{2}\n'.format(self.model['rstar'],
-                            self.model['mstar'],
-                            self.model['tstar']))
+                '{0:13.7e}\n'
+                '{1:13.7e}\n'
+                '{2:13.8f}\n'.format(float(self.model['rstar']) * co.R_sun.cgs.value,
+                            float(self.model['mstar']) * co.M_sun.cgs.value,
+                            float(self.model['tstar']) ))
     
         # Stellar spectrum in the wavelength range, black body emission
-        # 'plancknu' gives output in Jy, multiply with 1e-23 std units
-        sspec = (float(self.model['rstar']) / co.pc.cgs.value)**2. * pi * \
-                plancknu(self.freq, float(self.model['tstar']))*1e-23     
-        text = ['{0:20}\t{1:20}\n'.format(i,j) for i,j in zip(self.freq, sspec)]
+        # 'plancknu' gives output in Jy, multiply with 1e-23 cgs units
+        # erg / (s cm^2 Hz)
+        text = ['{0:13.7e}\t{1:13.7e}\n'.format(i,j) for i,j in zip(self.freq, self.stellar_spec)]
         with open(os.path.join(self.directory, 'starspectrum.inp'), 'w') as f:
+            f.write('{0} \n'.format(len(self.freq)))
             f.writelines(text)
-    
+        
         # interstellar radiation field
         if float(self.model['tbg']) == 0.0 and not self.model.has_key('isrf'):
             bgspec = zeros((len(self.freq)),float)
@@ -799,31 +798,17 @@ class Transphere(object):
             f.close()
         elif self.model['tbg'] > 0: 
                 bgspec = plancknu(self.freq, float(self.model['tbg']) ) * 1e-23
-        
-        text = ['{0:20}\t{1:20}\n'.format(i,j) for i,j in zip(self.freq, bgspec)]
+        text = ['{0:13.7e}\t{1:13.7e}\n'.format(i,j) for i,j in zip(self.freq, bgspec)]
         with open(os.path.join(self.directory, 'external_meanint.inp'), 'w') as f:
             f.write('{0}\n'.format(len(self.freq)))
             f.writelines(text)
 
         with open(os.path.join(self.directory, 'envstruct.inp'),'w') as f:
-            f.write(str(len(self.r))+'\n')
-            f.write(' '+'\n')
+            f.write('{0} \n\n'.format(str(len(self.r))))
             # rho_dust has unit g/cm3
             for ir in range(0,len(self.r)):
-                f.write("%13.6E %13.6E %13.6E\n" % (self.r[ir], self.rho_dust[ir], 0.e0))
-          
-        #Write all stuff to disk
-        # write frequency file# MODELING HELP FUNCTIONS
-        # write opacity inputdef bplanck(nu,T): # Returns the Spectral Radiance (Planck)
-        # write 'transphere.inp' file    from scipy import exp, constants
-        # write 'starinfo.inp' file    try:
-        # write 'starspectrum.inp' file        x = _cgs.HH*nu/(_cgs.KK*T)
-        # write 'external_meanint.inp' file        bpl = (2.0*_cgs.HH*nu**3/_cgs.CC**2)/(exp(x)-1.0)
-        # write 'envstruct.inp' file        return bpl
-        # run transphere    except (ZeroDivisionError):
-        # read in results        return 0
-        # plot results
-        
+                f.write("%13.6E %13.6E %13.6E\n" % (self.r[ir] * co.au.cgs.value, self.rho_dust[ir], 0.e0))
+       
         return None
 
     def run(self, nice = 0):
@@ -886,15 +871,18 @@ class Transphere(object):
         # we want to
         self.transphere_output = ''.join(trans_out)
         # read in the output-files, for checks, plots etc
-        self.Envstruct, self.Convhist = read_transphereoutput(self)
-        if self.t_uplim:
-            ind = (self.Envstruct.temp >= self.t_uplim).nonzero()[0]
-            self.Envstruct.temp[ind] = self.t_uplim
-        elif self.t_flat:
-            ind = (self.radii <= self.t_flat).nonzero()[0]
+        #~ self.Envstruct, self.Convhist = read_transphereoutput(self)
+        #~ if self.t_uplim:
             #~ ind = (self.Envstruct.temp >= self.t_uplim).nonzero()[0]
-            self.Envstruct.temp[ind] = self.Envstruct.temp[max(ind)]
-        
+            #~ self.Envstruct.temp[ind] = self.t_uplim
+        #~ elif self.t_flat:
+            #~ ind = (self.radii <= self.t_flat).nonzero()[0]
+            #ind = (self.Envstruct.temp >= self.t_uplim).nonzero()[0]
+            #~ self.Envstruct.temp[ind] = self.Envstruct.temp[max(ind)]
+
+# run transphere    except (ZeroDivisionError):
+# read in results        return 0
+# plot results
 
 def read_transphereoutput(self, ext = 0):
     from scipy import array

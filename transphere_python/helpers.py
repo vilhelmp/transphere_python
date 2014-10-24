@@ -101,11 +101,11 @@ def plancknu(nu, temp):
         # commented out the approximations.
         # why do we need them?
         # Rayleigh-Jeans approximation (? low frequencies)
-        #~ ind = x < 1e-5 
-        #~ bbnu[ind] = 2.0 * nu[ind]**2 * co.k_B.cgs.value * temp / (co.c.cgs.value**2)
-        #~ # Wiens approximation (? high frequencies)
-        #~ ind = x > 20.0
-        #~ bbnu[ind] = 2.0 * co.h.cgs.value * nu[ind]**3 / (co.c.cgs.value**2) * exp(-1.0*x[ind])
+        ind = x < 1e-5
+        bbnu[ind] = 2.0 * nu[ind]**2 * co.k_B.cgs.value * temp / (co.c.cgs.value**2)
+        # Wiens approximation (? high frequencies)
+        ind = x > 20.0
+        bbnu[ind] = 2.0 * co.h.cgs.value * nu[ind]**3 / (co.c.cgs.value**2) * exp(-1.0*x[ind])
     except (TypeError): # if TypeError is raised, its an integer
                         # so treat it like one
         bbnu = 2.0 * co.h.cgs.value * nu**3 / (co.c.cgs.value**2) * (1.0/(exp(x) - 1.0))
@@ -113,16 +113,16 @@ def plancknu(nu, temp):
             bbnu = 0.0
         else:
             bbnu = 2.0 * co.h.cgs.value * nu**3 / (co.c.cgs.value**2) * (1.0/(exp(x) - 1.0))
-        #~ if x == 0:
-            #~ bbnu = 0.0
-        # Rayleigh-Jeans approximation (? low frequencies)
-        #~ elif x < 1e-5:
-            #~ bbnu = 2.0 * nu**2 * co.k_B.cgs.value * temp / (co.c.cgs.value**2)
-        #~ # Wiens approximation (? high frequencies)
-        #~ elif x > 20.0:
-            #~ bbnu = 2.0 * co.h.cgs.value * nu**3 / (co.c.cgs.value**2) * exp(-1.0*x)
-        #~ else:
-            #~ bbnu = 2.0 * co.h.cgs.value * nu**3 / (co.c.cgs.value**2) * (1.0/(exp(x) - 1.0))
+        if x == 0:
+            bbnu = 0.0
+        #~ # Rayleigh-Jeans approximation (? low frequencies)
+        elif x < 1e-5:
+            bbnu = 2.0 * nu**2 * co.k_B.cgs.value * temp / (co.c.cgs.value**2)
+        # Wiens approximation (? high frequencies)
+        elif x > 20.0:
+            bbnu = 2.0 * co.h.cgs.value * nu**3 / (co.c.cgs.value**2) * exp(-1.0*x)
+        else:
+            bbnu = 2.0 * co.h.cgs.value * nu**3 / (co.c.cgs.value**2) * (1.0/(exp(x) - 1.0))
     # return Jy
     return bbnu*1e23
 
@@ -410,10 +410,10 @@ def transphere_write_frequencyfile(freq):
         #~ fout.write('%13.7e\n'%(freq[inu]))
     fout.close()
 
-# find kappa at 550 nm
-def find_kappa_550nm(opac):
+# find kappa at X nm
+def find_kappa(lam, opac_abs, lam0=550.0, localdust=False):
     """
-    Find kappa at 550 nm
+    Find kappa at lam0 nm
     
     Remember : nm 1e-9, microns 1e-6 i.e. 550 nm = 0.55 microns
     
@@ -423,27 +423,64 @@ def find_kappa_550nm(opac):
     could perhaps be done more robust, i.e. independent of the 
     direction of 'lam'
     """
+    #~ lam0 = 0.55 # in microns
     
+    if not (len(lam)==len(opac_abs)):
+        raise StandardError('Input array not of same length.')
     
-    lam0 = 0.55 # in microns
-    # this doesn't make sense either
-    # ivis will now be the next after the last element in the opac['lam']
-    # array. i.e. nonexistent! raising an error later in the eps calc
-    #~ ivis = (opac['lam'] > lam0).nonzero()[0][-1]+1 # smaller than lam0
-    # I removed the +1 and then it works, of course.
-    # I now also changed to grab the first element, because
-    # I think we want the position where the lam~0.55 nm? 
-    # where lam>0.55 holds, so this indes-1 is where we want to look
-    ivis = (opac['lam'] > lam0).nonzero()[0][0]
-    eps = (lam0 - opac['lam'][ivis]) / (opac['lam'][ivis-1] - opac['lam'][ivis])
-    kappa1 = float(eps) * ( opac['kabs'][ivis-1] + opac['kabs'][ivis] )
-    
-    
-    # alternative... linear interpolation
-    m = (opac['kabs'][ivis-1] - opac['kabs'][ivis]) / (opac['lam'][ivis-1] - opac['lam'][ivis])
-    kappa = m * (lam0 - opac['lam'][ivis-1]) + opac['kabs'][ivis-1]
-    print('Daniels interpolation? {0:f}, Linear interpolation : {1:f}'.format(kappa1, kappa))
-    
+    if localdust:
+        raise StandardError('\'localdust\' parameter not implemented yet.')
+    elif not localdust:
+        # first find between which 'lam' that lam0 lies
+        nu_ind = (lam > lam0).nonzero()[0][0]
+        # then calculate the opacity at 0.55 microns
+        eps = (lam0 - lam[nu_ind-1]) / (lam[nu_ind] - lam[nu_ind-1])
+        kappa = (1.-eps)*opac_abs[nu_ind-1] + eps*opac_abs[nu_ind]      
+    """
+    Original IDL code from Transphere release:
+    ;
+    ; Find the kappa at 550 nm
+    ;
+    if keyword_set(localdust) then begin
+       openr,1,'dustopac_0.inp'
+       nnr=0
+       nnf=0
+       idum=0
+       readf,1,nnr
+       readf,1,nnf,idum
+       if nnr ne nr then stop
+       if nnf ne nf then stop
+       kap = dblarr(nf,2,nr)
+       readf,1,kap
+       close,1
+       ivis   = 0
+       fvis   = 1d4 * cc / 0.55d0 
+       for inu=1,nf-1 do if((o.freq[inu]-fvis)*   $
+                            (o.freq[inu-1]-fvis) lt 0.d0) then ivis=inu
+       eps    = (fvis-o.freq[ivis-1]) / (o.freq[ivis]-o.freq[ivis-1])
+       kappa  = transpose((1.d0-eps)*kap[ivis-1,0,*]+eps*kap[ivis,0,*],[2,0,1])
+    endif
+
+    Old Python CODE
+    if localdust == 1:
+        f=open('dustopac_0.inp','r')
+        nr=int(f.readline().strip())
+        nf,idum=readlines().strip().split()
+        nf,idum=int(nf),int(idum)
+        kap=np.zeros((nf,2,nr),float)
+        for kk in range(0,nr):
+            for jj in range(0,2):
+                for ii in range(0,nf):
+                    kap[ii,jj,kk]=float(f.readline().strip())
+        f.close()
+        ivis   = 0
+        fvis   = 1e4 * nc.cc / 0.55e0 
+        for inu in range(1,nf):
+            if (o.freq[inu]-fvis)*(o.freq[inu-1]-fvis) < 0.e0: ivis=inu
+        eps    = (fvis-o.freq[ivis-1]) / (o.freq[ivis]-o.freq[ivis-1])
+        kappa  = (1.e0-eps)*kap[ivis-1,0,:]+eps*kap[ivis,0,:] # Removed transpose
+      
+    """
     return kappa
 
 # construct the radial grid
@@ -609,7 +646,7 @@ def read_transphere_modelfile(modelfile):
         ncex = 30
         ncnr = 1
         itypemw = 1
-        idump = 1    
+        idump = 1
     
     Output
     ------
@@ -628,23 +665,42 @@ def read_transphere_modelfile(modelfile):
     settings = dict(parser.items('settings'))
     # convert relevant input in model
     model['wl_interval'] = [float(i) for i in model['wl_interval'].split(',')]
-    model['wl_points'] = [int(i) for i in model['wl_points'].split(',')]
+    try:
+        model['wl_points'] = [int(i) for i in model['wl_points'].split(',')]
+    except AttributeError:
+        model['wl_points'] = int(model['wl_points'])
     model['nin'] = int(model['nin'])
     model['nout'] = int(model['nout'])
     model['rref'] = float(model['rref'])
     model['rin'] = float(model['rin'])
     model['rout'] = float(model['rout'])
-    model['n0'] = float(model['n0'])
+    if 'n0' in model.keys():
+        model['n0'] = float(model['n0'])
+    # if no number density was given, it is 
+    # the gas mass density
+    elif 'rho0' in model.keys():
+        model['rh0'] = float(model['rh0'])
+        # convert this to gas number density
+        # using mean mass of 2.3
+        muh2 = 2.3
+        n0 = model['rho0'] / (muh2 * co.m_p.cgs.value)
+        model['n0'] = n0
     model['r0'] = float(model['r0'])
     model['plrho'] = float(model['plrho'])
     model['tbg'] = float(model['tbg'])
     model['dpc'] = float(model['dpc'])
-    try:
-        model['g2d'] = model['g2d']
-    except KeyError:
+    if 'g2d' not in model.keys():
         print ('gas to dust ration not given, assume 100 ')
-        print ('If you want to tweak this, add \'g2d\' to model section')
         model['g2d'] = 100.
+    else:
+        model['g2d'] = float(model['g2d'])
+    if 'localdust' not in model.keys():
+        model['localdust'] = False
+    else:
+        try:
+            model['localdust'] = bool(eval( model['localdust'].title() ))
+        except TypeError:
+            raise TypeError('Parameter \'localdust\' error, evaluated to True or False only.')
     # convert relevant input in settings
     settings['plot'] = bool(settings['plot'])
     
@@ -657,6 +713,7 @@ def write_opac(nf = -1,opac=-1, directory=None):
     """
     Write the opacity input files
     """
+    #TODO needs update
     if nf == -1:
         print 'nf is not define here....'
         sys.exit()
