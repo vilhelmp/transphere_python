@@ -14,9 +14,9 @@
 # so putting Tstar as Tsun we control the luminosity only by the 
 # Radius, taking Rstar = sqrt(L/Lsun) we get the R/Rsun value
 # applicable for our model.
-rstar =  5.97
+rstar =  1
 mstar = 1.
-tstar = 5780.  
+tstar = 5000.  
 
 # Next up is the radial sampling
 # 'nin' - number of points in the refinement
@@ -26,18 +26,19 @@ tstar = 5780.
 # 'rout' - outer radius of the grid
 # naturally, rin < rref < rout must hold
 nin = 10
-nout = 60
-rref = 100
-rin = 35.9 
-rout = 17500.
+nout = 50
+rref = 500
+rin = 10 
+rout = 1.0E4
 
 # Here we define the density distribution
 # for now its only powerlaw of the form
 # n = n0 * (r/r0)**plrho
 # Instead of n0, can also be rho0
-n0 = 4.9E8    
-plrho = -1.7
-r0 = 35.9
+n0 = 1.0e4    
+#rho0 = 4.9E8    
+plrho = -1.5
+r0 = 1.0E3
 
 # 'opcafile' name of the opacity file in the opacities directory
 # if you want to define other inputs that are not available 
@@ -50,7 +51,7 @@ opacfile = oh5_draine.dat
 # what will happen with different input with tbg, isrf
 #
 # background temperature
-tbg = 2.73
+tbg = 0
 # interstellar radiation field
 # if you give isrf parameter, 
 # it needs to be the file to use as 
@@ -62,7 +63,6 @@ tbg = 2.73
 # distance to source in Parsec
 dpc = 235
 
-
 # Here we give input for the creation of the wavelength grid used in
 # the spectrum in micro meters. Relates to the opacities.
 # TODO : Need to motivate some template here
@@ -72,8 +72,8 @@ dpc = 235
 # so e.g. wl_interval = [0.01,7.0,50.0,5e4], and wl_points = [50,40,40]
 # would give a grids between, 0.01-7.0, 7.0-50.0 and 50.0-5E4 microns
 # with 50, 40 and 40 points in them
-wl_interval = 0.01, 7.0, 50.0, 5e4
-wl_points = 50, 40, 40
+wl_interval = 10, 3600
+wl_points = 100
 
 [settings]
 # draw figures of input/output?

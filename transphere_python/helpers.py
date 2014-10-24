@@ -256,14 +256,17 @@ def create_wavelength_grid(wl_interval = [0.01, 7., 50., 5.0e4], wl_points = [50
     # A frequency grid is created, with extra points 
     # with some kind of spacing...
     # TODO : make this better (pythonic) and explain more...
+    #~ print wl_interval
+    #~ print wl_points
     wav  = wl_interval[0] * (wl_interval[1]/wl_interval[0])**(arange(wl_points[0], dtype='float64') / wl_points[0])
-    for ipart in range(1,len(wl_points)-1): 
-        dum = wl_interval[ipart] * (wl_interval[ipart+1]/wl_interval[ipart])**(arange(wl_points[ipart], dtype='float64') / wl_points[ipart])
+    if len(wl_points)>1:
+        for ipart in range(1,len(wl_points)-1): 
+            dum = wl_interval[ipart] * (wl_interval[ipart+1]/wl_interval[ipart])**(arange(wl_points[ipart], dtype='float64') / wl_points[ipart])
+            wav = np.append(wav, dum)
+        
+        ipart = len(wl_points)-1
+        dum = wl_interval[ipart] * (wl_interval[ipart+1]/wl_interval[ipart])**(arange(wl_points[ipart], dtype='float64') / (wl_points[ipart]-1.))
         wav = np.append(wav, dum)
-    
-    ipart = len(wl_points)-1
-    dum = wl_interval[ipart] * (wl_interval[ipart+1]/wl_interval[ipart])**(arange(wl_points[ipart], dtype='float64') / (wl_points[ipart]-1.))
-    wav = np.append(wav, dum)
     # number of wavelength points
     nwav  = wav.shape[0]
     # convert wavelength in microns to frequency in Hz
