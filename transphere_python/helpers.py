@@ -258,10 +258,10 @@ def create_wavelength_grid(wl_interval = [0.01, 7., 50., 5.0e4], wl_points = [50
     # TODO : make this better (pythonic) and explain more...
     #~ print wl_interval
     #~ print wl_points
-    wav  = wl_interval[0] * (wl_interval[1]/wl_interval[0])**(arange(wl_points[0], dtype='float64') / wl_points[0])
+    wav  = wl_interval[0] * (wl_interval[1]/wl_interval[0])**(arange(wl_points[0], dtype='float64') / (wl_points[0]-1.))
     if len(wl_points)>1:
         for ipart in range(1,len(wl_points)-1): 
-            dum = wl_interval[ipart] * (wl_interval[ipart+1]/wl_interval[ipart])**(arange(wl_points[ipart], dtype='float64') / wl_points[ipart])
+            dum = wl_interval[ipart] * (wl_interval[ipart+1]/wl_interval[ipart])**(arange(wl_points[ipart], dtype='float64') / (wl_points[ipart]-1.))
             wav = np.append(wav, dum)
         
         ipart = len(wl_points)-1
@@ -334,10 +334,13 @@ def interpolate_opacities(opac = None, freq = None):
     kabs = zeros(nfreq)
     kscat = zeros(nfreq)
     
+    # this will cause the wavlength to decrease with index
+    # because frequency goes up with index.
     wl_micron = co.c.to(un.um/un.s).value/freq # microns
     # check...
     #~ print co.c.cgs.value / freq * 1e4 - wl_micron # microns
-    
+    # when we loop through it now, we are going from longer
+    # wavelengths to shorter.
     for ifreq in range(nfreq):        
         lampk = wl_micron[ifreq]
 
@@ -357,7 +360,6 @@ def interpolate_opacities(opac = None, freq = None):
         # the 
         else:
             # Find kappa
-            # 
             isub = (opac['lam'] > lampk).nonzero()[0][0]-1
             eps = (log10(lampk) - log10(opac['lam'][isub])) / (log10(opac['lam'][isub+1])-log10(opac['lam'][isub]))
             # calculate the Absorption Coefficient
@@ -489,7 +491,7 @@ def find_kappa(lam, opac_abs, lam0=550.0, localdust=False):
 # construct the radial grid
 # this is for transphere at the moment, have to eval. different
 # software, might need different points
-def transphere_make_r_grid(rin=1., rout=1000., rref=100., nout=50, nin=10):
+def transphere_make_r_grid(rin=1., rout=1000., rref=100., nout=30, nin=60):
     """
     Create logarithmically spaced grid with refinement
     If you want without refinement, just run
@@ -511,11 +513,58 @@ def transphere_make_r_grid(rin=1., rout=1000., rref=100., nout=50, nin=10):
     from scipy import logspace, log10
     if any([rref<rin, rref>rout, rin>rout]):
         raise StandardError('Wrong intput, must be rin<rref<rout')
-    r1 = logspace(log10(rin), log10(rref), num=nin, endpoint=False)
-    r2 = logspace(log10(rref), log10(rout), num=nout, endpoint=True)
-    r = concatenate( (r1, r2) )
-
+    #~ r1 = logspace(log10(rin), log10(rref), num=nin, endpoint=False)
+    #~ r2 = logspace(log10(rref), log10(rout), num=nout, endpoint=True)
+    #~ r = concatenate( (r1, r2) )
+    #~ rgrid = lambda rin, rout, nr: rin * (rout/rin)**(arange(nr)/(nr - 1.))
+    print nin
+    if nin>0:
+        r_inner = logspace(log10(rin), log10(rref), num=nin, endpoint=False)
+        r_outer = logspace(log10(rref), log10(rout), num=nout, endpoint=True)
+        
+        c_inner = r_inner[1:]/r_inner[:-1]
+        c_outer = r_outer[1:]/r_outer[:-1]
+        if c_inner[0] > c_outer[0]:
+            # perhaps raise an error?
+            print('You are not createing a refinement in the inner parts...')
+        r = concatenate((r_inner, r_outer))
+    elif not nin:
+        r = logspace(log10(rin),log10(rout), num=nout, endpoint=True)
+    #~ r_inner = rgrid(rin, rref, nin)
+    #~ r_outer = rgrid(rref, rout, nout)
+    # if no refinement 
+    # THIS is a log-linear grid.
+    # i.e. when ploting loglog() you get the same distance 
+    # between the points.    
+    #~ if nin == 0:
+        #~ r = rin * (rout/rin)**(arange(nout)/(nout - 1.))
     # Old code from Daniel, keep for reference.
+    #~ lgr0  = log10(rin)              # inner radius
+    #~ lgr1 = log10(rout)              # outer radius
+    #~ lgrr = log10(rref)              # refinement radius
+    #~ n1 = nin                            # refinement points
+    #~ n2 = nout - nin - 1                  # points left after refinement
+    #~ n = arange(nout) - n1             # 
+    #~ 
+    #~ c = (log10(rout) - log10(rref))/(n2)    # log spacing in the outer part part
+    #~ 
+    #~ b = c / (log10(rref) - log10(rin))           # log spacing in the inner part
+    #~ 
+    #~ r = zeros(nout)               
+    #~ 
+    # the inner grid
+    #~ r[0:n1+1] = (log10(rref) - log10(rin)) * exp(b*n[0:n1+1])        # 
+    #~ 
+    #~ # the outer grid
+    #~ r[n1+1:n1+n2+1] = (log10(rref) - log10(rin)) + c * n[n1+1:n1+n2+1]
+    #~ 
+    #~ # change the inner cell to 
+    #~ r = r - (r[0] + (r[0] - r[1]))
+    #~ # ?
+    #~ r = r * (log10(rout) - log10(rin))/(r.max()) + log10(rin)
+    #~ # 
+    #~ r = 10.0**r
+    
     '''
     This is very complicated...
     It could be vastly simplified. Also the function needs a nref < nr
@@ -560,10 +609,10 @@ def transphere_make_r_grid(rin=1., rout=1000., rref=100., nout=50, nin=10):
     return r
 
 # calculate the dust density given the radial grid    
-def transphere_calculate_density(r, n0=4.9e8, r0=35.9, plrho=-1.7, g2d=100., rho0=None):
+def transphere_calculate_density(r, n0=None, r0=None, plrho=None, rho0=None, g2d=100., muh2 = 2.3):
     """
     calculate the dust density as
-    rho = rho0 / g2d * (r/r0)**(prlho)
+    rho = rho0 / g2d * (r/r0)**(plrho)
     
     Input
     -----
@@ -591,11 +640,10 @@ def transphere_calculate_density(r, n0=4.9e8, r0=35.9, plrho=-1.7, g2d=100., rho
     # apply the radial dependence to the gas density
     #~ self.rho_gas = self.rho0_gas * r_dependence     # g * cm-3
     # apply radial dependence to the H2 number density
-    muh2 = 2.3
-    if n0:
+    if n0 != None:
         n_h2 = n0 * r_dependence              # nh2 * cm-3
         rho_gas = n_h2 * muh2 * co.m_p.cgs.value  # g * cm-3
-    elif rho0:
+    elif rho0 != None:
         rho_gas = rho0 * r_dependence
         n_h2 = rho_gas / ( muh2 * co.m_p.cgs.value )
     else:
@@ -742,5 +790,112 @@ def write_opac(nf = -1,opac=-1, directory=None):
     fout.close()
     
     print 'FINISH Opacs'
+
+
+
+# TODO need to make this better...
+def read_transphereoutput(directory='test_model1'):
+    from scipy import array
+    filetoread = 'envstruct.dat'
+    path_to_file = os.path.join(directory, filetoread)
+    with open(path_to_file, 'r') as f:
+        lines = f.read().split('\n')
+    nr = int(lines[0])
+    dat_envstruct = array([i.split() for i in lines[2:nr + 2]], dtype='float')
+
+
+    filetoread = 'spectrum.dat'
+    path_to_file = os.path.join(directory, filetoread)
+    with open(path_to_file, 'r') as f:
+        lines = f.read().split('\n')
+    nr = int(lines[0])
+    dat_spectrum = array([i.split() for i in lines[2:nr+2]], dtype='float')
+
+    #~ nr = int(f.readline().strip())
+    #~ dat = np.zeros((3,nr),float)
+    #~ for ii in range(0,3):
+        #~ for jj in range(0,nr):
+            #~ dum = f.readline().strip()
+            #~ dat[ii,jj] = dum
+    #~ f.close()
+    class Envstruct:
+        r = dat_envstruct[:,0]
+        rho_dust = dat_envstruct[:,1]
+        temp = dat_envstruct[:,2]
+
+    #~ class Spectrum:
+    Envstruct.frequency = dat_spectrum[:,0]
+    Envstruct.intensity = dat_spectrum[:,1]
+    #~ Envstruct.Spectrum = Spectrum
+    #~ self.Envstruct = Envstruct
+
+    #~ import numpy as np
+    filetoread = 'convhist.info'
+    path_to_file = os.path.join(directory, filetoread)
+    f = open(path_to_file, 'r')
+    nn = int(f.readline().strip().split()[0])
+    f.close()
+
+    # Convergence history
+    filetoread = 'convhist.dat'
+    path_to_file = os.path.join(directory, filetoread)
+    with open(path_to_file, 'r') as f:
+        lines = f.read().split('\n')
+    nr = int(lines[0].strip())
+    if nr == 0: raise Exception('Nothing run, no convergence history.')
+    x1 = nr+1
+
+    #These need to depend on value of nr
+    dat1 = array([i.split() for i in lines[1:x1]], dtype='float')
+    dat2 = array([i.split() for i in lines[x1+1:x1*2]], dtype='float')
+    dat3 = array([i.split() for i in lines[x1*2+1:x1*3]], dtype='float')
+
+    dat = array([dat1,dat2,dat3])
+
+    #~ f = open('convhist.dat','r')
+    #~ nr = int(f.readline().strip())
+    #~ dat = np.zeros((9,nn,nr),float)
+    #~ for jj in range(0,nn):
+        #~ for kk in range(0,nr):
+            #~ dum = f.readline().strip().split()
+            #~ if dum == []: dum=f.readline().strip().split()
+            #~ dat[0:9,jj,kk]=np.array(dum,dtype=float)
+    #~ f.close()
+
+#    if nn gt 1 then idx=[1,2,0] else idx=[1,0]. Note transpose commands not executed...
+    class Convhist:
+        temp=dat[:,:,0]
+        jjme=dat[:,:,1]
+        hhme=dat[:,:,2]
+        jj=  dat[:,:,3]
+        hh=  dat[:,:,4]
+        kapt=dat[:,:,5]
+        kapj=dat[:,:,6]
+        kaph=dat[:,:,7]
+        fj=  dat[:,:,8]
+    #~ self.Convhist = Convhist
+
+    #~ f = open('envstruct.inp')
+    #~ nr = int(f.readline().strip())
+    #~ dat = np.zeros((3,nr),float)
+    #~ for ii in range(0,nr):
+        #~ dum=f.readline().strip().split()
+        #~ if dum == []: dum=f.readline().strip().split()
+        #~ dat[0:3,ii]=np.array(dum,dtype=float)
+    #~ r=dat[0,:]
+    #~ f.close()
+
+    #~ convhist={'r': r, 'temp': temp, 'jjme': jjme, 'hhme': hhme, 'jj': jj, 'hh': hh, 'kapt': kapt, 'kapj': kapj, 'kaph': kaph, 'fj': fj}
+    #~ self.Envstruct = envstruct
+    #~ self.convhist = convhist
+    #~ if self.t_uplim:
+        #~ ind = (Envstruct.temp >= self.t_uplim).nonzero()[0]
+        #~ Envstruct.temp[ind] = self.t_uplim
+    #~ elif self.t_flat:
+        #~ ind = (self.radii <= self.t_flat).nonzero()[0]
+        #ind = (self.Envstruct.temp >= self.t_uplim).nonzero()[0]
+        #~ Envstruct.temp[ind] = Envstruct.temp[max(ind)]
+    return Envstruct, Convhist
+
 
 

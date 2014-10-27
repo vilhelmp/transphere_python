@@ -662,7 +662,7 @@ class Make(object):
 class Transphere(object):
     
     
-    def __init__(self, modelfile = 'trans_input.inp'):
+    def __init__(self, modelfile = 'trans_input.inp', muh2=2.8):
         # read in the model parameters and convert some of them
         # to relevant types
         model, settings = read_transphere_modelfile(modelfile)
@@ -689,10 +689,11 @@ class Transphere(object):
         n_h2, rho_gas, rho_dust = transphere_calculate_density(
             r, 
             n0 = model['n0'], 
-            r0= model['r0'], 
+            r0 = model['r0'], 
             plrho = model['plrho'], 
             g2d = model['g2d'],  # default is 100, is set in reader
-            rho0 = None)
+            rho0 = None,
+            muh2=muh2)
         # calculate tau
         # kappa is dust opacities, so rho_dust should be input, right?
         tau = transphere_calculate_tau(r, rho_dust, kappa)
