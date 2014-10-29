@@ -1,0 +1,97 @@
+# This is a model file to be read in by a
+# Transphere Python script.
+# More about Transphere :
+# http://www.ita.uni-heidelberg.de/~dullemond/software/transphere/index.shtml
+#
+# This file is compatible with the Python ConfigParser
+# Please leave the sections, marked with brackets like:
+# [section]
+
+[model]
+
+# This model is the IRAS 2A DUSTY model by Kristensen et al. (2012)
+
+# 'rstar' gives the radius of the star. It relates to the luminosity as:
+# sqrt(Lsun), RSUN [ L/Lsun = (R/Rsun)**2 * (T/Tsun)**4 ]
+# so putting Tstar as Tsun we control the luminosity only by the 
+# Radius, taking Rstar = sqrt(L/Lsun) we get the R/Rsun value
+# applicable for our model.
+rstar =  5.974947698515862
+mstar = 1.
+tstar = 5780.  
+
+# Next up is the radial sampling
+# 'nin' - number of points in the refinement
+# 'nout' - number of points outside the refinement 
+# 'rref' - outer radius of the refinement
+# 'rin' - inner radius of the grid
+# 'rout' - outer radius of the grid
+# naturally, rin < rref < rout must hold
+nin = 50
+nout = 50
+rref = 100
+rin = 35.9 
+rout = 17950.
+
+# Here we define the density distribution
+# for now its only powerlaw of the form
+# n = n0 * (r/r0)**plrho
+# Instead of n0, can also be rho0
+# n0 in cm**-3
+n0 = 4.9E8
+# rho0 in g cm**-2
+#rho0 = 4.9E8
+plrho = -1.7
+r0 = 35.9
+
+# 'opcafile' name of the opacity file in the opacities directory
+# if you want to define other inputs that are not available 
+# in the opacities dir, or link to your own opacities dir
+# change the OPACDIR to point to your dir and 'opacfile' 
+# below accordingly
+# available now : oh5.dat and oh5_draine.dat
+opacfile = oh5.dat
+
+#TODO add better explanation to 
+# what will happen with different input with tbg, isrf
+#
+# background temperature
+tbg = 0
+# interstellar radiation field
+# if you give isrf parameter, 
+# it needs to be the file to use as 
+# interstellar radiation field
+# this will disregard the tbg parameter
+
+# isrf = filename.inp
+
+# distance to source in Parsec
+dpc = 235
+
+# Here we give input for the creation of the wavelength grid used in
+# the spectrum in micro meters. Relates to the opacities.
+# TODO : Need to motivate some template here
+# 'wl_interval' - gives the [start, stopstart, stopstart, stop]
+# points for the grid
+# 'wl_points' - gives the number of points in each interval
+# so e.g. wl_interval = [0.01,7.0,50.0,5e4], and wl_points = [50,40,40]
+# would give a grids between, 0.01-7.0, 7.0-50.0 and 50.0-5E4 microns
+# with 50, 40 and 40 points in them
+wl_interval = 0.05, 36000.
+wl_points = 100
+
+[settings]
+# draw figures of input/output?
+# will be saved in sub-dir 'plots'
+plot = False
+# name of directory to write everything to
+dirname = test_model1
+# number of iterations
+nriter = 30
+# convergence criteria
+convcrit = 1e-06
+ncst = 10
+ncex = 30
+ncnr = 1
+itypemw = 1
+idump = 1
