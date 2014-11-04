@@ -16,6 +16,7 @@ NiceLineSettings = dict(lw=1, ms=3, mew=0, marker='o')
 
 
 ########################################################################
+# OLD Make object
 class Make(object):
     """
     Title
@@ -658,9 +659,9 @@ class Make(object):
             ind = (self.radii <= self.t_flat).nonzero()[0]
             #~ ind = (self.Envstruct.temp >= self.t_uplim).nonzero()[0]
             self.Envstruct.temp[ind] = self.Envstruct.temp[max(ind)]
-        
+
+# new Transphere object
 class Transphere(object):
-    
     
     def __init__(self, modelfile = 'trans_input.inp', muh2=2.8):
         # read in the model parameters and convert some of them
@@ -679,12 +680,20 @@ class Transphere(object):
         # find kappa at 550 nm (why?)        
         kappa = find_kappa(raw_opacities['lam'], raw_opacities['kabs'], lam0=550.0, localdust = model['localdust'])
         # create radial grid        
-        r = transphere_make_r_grid(
+        r_grid = make_r_grid(
             rin = model['rin'], 
             rout = model['rout'], 
             rref = model['rref'], 
             nout = model['nout'], 
             nin = model['nin'])
+        # calculate the center of mass positions
+        # if we make sure to save the original 
+        # grid, or at least use same parameters
+        # we can use the grid for RATRAN
+        # and the center of mass positions in Transphere
+        r = calculate_com_pos_plrho(
+			r_grid = r_grid,
+			plrho = model['plrho'])
         # calculate density profile
         n_h2, rho_gas, rho_dust = transphere_calculate_density(
             r, 
@@ -708,6 +717,7 @@ class Transphere(object):
         self.raw_opacities = raw_opacities
         self.interp_opacities = interp_opacities
         self.kappa = kappa
+        self.r_grid = r_grid
         self.r = r 
         self.n_h2 = n_h2
         self.rho_gas = rho_gas

@@ -491,7 +491,7 @@ def find_kappa(lam, opac_abs, lam0=550.0, localdust=False):
 # construct the radial grid
 # this is for transphere at the moment, have to eval. different
 # software, might need different points
-def transphere_make_r_grid(rin=1., rout=1000., rref=100., nout=30, nin=60):
+def make_r_grid(rin=1., rout=1000., rref=100., nout=30, nin=60):
     """
     Create logarithmically spaced grid with refinement
     If you want without refinement, just run
@@ -607,6 +607,12 @@ def transphere_make_r_grid(rin=1., rout=1000., rref=100., nout=30, nin=60):
     r = 10.0**r
     '''
     return r
+
+def calculate_com_pos_plrho(r_grid = None, plrho = None):
+	# commong exponent 
+	pl = 3 - plrho
+	r = ( .5*( r_grid[1:]**pl + r_grid[:-1]**pl ) )**(1 / pl)
+	return r
 
 # calculate the dust density given the radial grid    
 def transphere_calculate_density(r, n0=None, r0=None, plrho=None, rho0=None, g2d=100., muh2 = 2.3):
