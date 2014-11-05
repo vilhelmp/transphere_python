@@ -1,7 +1,7 @@
 import transphere_python as tp
 
 # will read ing example_input
-example = tp.Transphere(modelfile='example_input_iras2a.inp') 
+example = tp.Transphere(modelfile='example_input_iras2a.conf') 
 # at this point you can in IPython type "example." and 
 # press "tab" to get various attributes that you can plot
 # e.g. example.freq vs example.stellar_spec 
