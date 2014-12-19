@@ -615,7 +615,7 @@ def calculate_com_pos_plrho(r_grid = None, plrho = None):
 	return r
 
 # calculate the dust density given the radial grid    
-def transphere_calculate_density(r, n0=None, r0=None, plrho=None, rho0=None, g2d=100., muh2 = 2.3):
+def transphere_calculate_density(r, n0=None, r0=None, plrho=None, rho0=None, g2d=100., muh2 = 2.8):
     """
     calculate the dust density as
     rho = rho0 / g2d * (r/r0)**(plrho)
@@ -634,8 +634,7 @@ def transphere_calculate_density(r, n0=None, r0=None, plrho=None, rho0=None, g2d
     Output
     ------
     n_h2, rho_gas, rho_dust
-    
-    
+        
     """
     # Correct the density profile
     r_dependence  = (r/r0)**(plrho)
