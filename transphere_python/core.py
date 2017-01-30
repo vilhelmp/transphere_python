@@ -13,8 +13,6 @@ from .helpers import *
 #nice line settings
 NiceLineSettings = dict(lw=1, ms=3, mew=0, marker='o')
 
-
-
 ########################################################################
 # OLD Make object
 class Make(object):
